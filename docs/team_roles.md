@@ -1,5 +1,6 @@
 # 같이타(GachiTa) 2인 팀 개발 역할 분담표
 
+**문서 버전:** v1.1 · 이름·경로 정리: 2026-11-11  
 **기준:** PRD v1.5 / 기능 정의서 v1.1 / 화면 설계서 v1.0  
 **개발 인원:** 2명  
 **목표:** 2개월 내 MVP 구현  
@@ -22,8 +23,8 @@
 | 택시방 생성 | 출발지·목적지·시간·인원 저장 | `RoomController.java`, `RoomService.java`, `RoomRepository.java` |
 | 택시방 목록·검색·상세 | 목적지 검색 및 방 정보 조회 | `RoomController.java`, `RoomService.java` |
 | 동승 신청·승인·거절·취소 | 사용자 참여 상태 처리 | `ParticipationController.java`, `ParticipationService.java`, `ParticipationRepository.java` |
-| 정산 금액 계산 | 최대 4명 기준 1인당 요금 계산 | `PaymentService.java` |
-| 요금 입력 및 수령 확인 | 방장의 '받았음' 처리 | `PaymentController.java`, `PaymentService.java`, `PaymentRepository.java` |
+| 정산 금액 계산 | 최대 4명 기준 1인당 요금 계산 | `SettlementService.java` |
+| 요금 입력 및 수령 확인 | 방장의 '받았음' 처리 | `SettlementController.java`, `SettlementService.java`, `SettlementRepository.java` |
 
 ### 추가로 필요한 파일
 
@@ -53,8 +54,8 @@
 - `Settlement.java` — 정산 정보 Entity
 - `SettlementParticipant.java` — 사용자별 부담 금액과 수령 상태
 - `SettlementParticipantRepository.java` — 개인별 정산 정보 저장
-- `PaymentRequest.java` — 최종 요금 입력 요청 DTO
-- `PaymentResponse.java` — 정산 결과 응답 DTO
+- `SettlementRequest.java` — 최종 요금 입력 요청 DTO
+- `SettlementResponse.java` — 정산 결과 응답 DTO
 
 DTO와 상태 Enum 이름은 실제 코드 작성 시 팀원 간 합의하여 조정할 수 있다.
 
@@ -175,9 +176,9 @@ MVP에서는 기본 UI를 우선 구현한다.
 
 ---
 
-# 2. 추천 프로젝트 폴더 구조
+# 2. 통일된 프로젝트 폴더 구조
 
-기존 `GachiTa` Expo 프로젝트를 유지하고, 백엔드 프로젝트를 별도 폴더로 추가한다.
+기존 `GachiTa` Expo 프로젝트와 빈 골격을 유지한다. 이름과 경로는 [공통 개발 지시서 3.1절](../GachiTa_COMMON_DEV_RULES.md#31-통일된-파일폴더-이름)을 기준으로 한다. `[예정]` 경로와 위 Java 클래스 목록은 해당 기능 개발 시 생성하며, 현재 구현 완료를 뜻하지 않는다.
 
 ```text
 GachiTa/
@@ -185,12 +186,16 @@ GachiTa/
 ├── src/
 │   ├── app/
 │   │   ├── _layout.tsx
+│   │   ├── index.tsx           [공통 · 기존 진입 화면]
+│   │   ├── explore.tsx         [기존 Expo 예제]
 │   │   │
 │   │   ├── (auth)/
+│   │   │   ├── _layout.tsx
 │   │   │   ├── login.tsx           [김동민]
 │   │   │   └── signup.tsx          [김동민]
 │   │   │
 │   │   ├── (tabs)/
+│   │   │   ├── _layout.tsx
 │   │   │   ├── index.tsx           [김동민]
 │   │   │   ├── rooms.tsx           [김동민]
 │   │   │   ├── chats.tsx           [서민수]
@@ -198,14 +203,18 @@ GachiTa/
 │   │   │
 │   │   ├── rooms/
 │   │   │   ├── create.tsx          [김동민]
-│   │   │   └── [id]/
+│   │   │   └── [roomId]/
 │   │   │       ├── index.tsx       [김동민]
-│   │   │       ├── applications.tsx[김동민]
+│   │   │       ├── participants.tsx [김동민]
 │   │   │       ├── chat.tsx        [서민수]
 │   │   │       ├── taxi.tsx        [서민수]
-│   │   │       └── settlement.tsx  [김동민]
+│   │   │       └── settlement/     [김동민]
+│   │   │           ├── index.tsx
+│   │   │           ├── amount.tsx
+│   │   │           ├── status.tsx
+│   │   │           └── complete.tsx
 │   │   │
-│   │   ├── maps/
+│   │   ├── map/
 │   │   │   └── picker.tsx          [서민수]
 │   │   │
 │   │   ├── history/               [김동민 · P1]
@@ -214,31 +223,40 @@ GachiTa/
 │   │   └── reports/               [서민수 · P1]
 │   │
 │   ├── components/
-│   │   ├── common/
+│   │   ├── ui/
 │   │   ├── rooms/                 [김동민]
 │   │   ├── settlement/            [김동민]
 │   │   ├── boarding/              [서민수]
-│   │   ├── chat/                  [서민수]
+│   │   ├── chat/                  [서민수 · 예정]
+│   │   ├── taxi/                  [서민수]
 │   │   └── maps/                  [서민수]
 │   │
 │   ├── features/
 │   │   ├── auth/                  [김동민]
-│   │   ├── user/                  [김동민]
 │   │   ├── rooms/                 [김동민]
-│   │   ├── participation/         [김동민]
+│   │   ├── participation/         [김동민 · 예정]
 │   │   ├── settlement/            [김동민]
 │   │   ├── boarding/              [서민수]
 │   │   ├── chat/                  [서민수]
 │   │   ├── maps/                  [서민수]
-│   │   └── taxi/                  [서민수]
+│   │   ├── taxi/                  [서민수]
+│   │   └── history/               [김동민 · P1]
 │   │
 │   ├── services/
-│   │   ├── api.ts
-│   │   └── tokenStorage.ts
+│   │   ├── apiClient.ts
+│   │   └── authStorage.ts
 │   ├── contexts/
 │   │   └── AuthContext.tsx
 │   ├── types/
+│   │   ├── contracts.ts
+│   │   ├── auth.ts
+│   │   ├── room.ts
+│   │   ├── boarding.ts
+│   │   ├── map.ts
+│   │   └── settlement.ts
 │   └── constants/
+│       ├── routes.ts
+│       └── theme.ts
 │
 ├── backend/
 │   ├── src/
@@ -248,15 +266,15 @@ GachiTa/
 │   │       │   ├── user/          [김동민]
 │   │       │   ├── room/          [김동민]
 │   │       │   ├── participation/ [김동민]
-│   │       │   ├── payment/       [김동민]
+│   │       │   ├── settlement/    [김동민]
 │   │       │   ├── history/       [김동민 · P1]
-│   │       │   ├── review/        [김동민 · P1]
+│   │       │   ├── review/        [김동민 · P1 · 예정]
 │   │       │   ├── boarding/      [서민수]
-│   │       │   ├── chat/          [서민수]
+│   │       │   ├── chat/          [서민수 · 예정]
 │   │       │   ├── map/           [서민수]
 │   │       │   ├── taxi/          [서민수]
-│   │       │   ├── friend/        [서민수 · P1]
-│   │       │   ├── report/        [서민수 · P1]
+│   │       │   ├── friend/        [서민수 · P1 · 예정]
+│   │       │   ├── report/        [서민수 · P1 · 예정]
 │   │       │   └── common/
 │   │       │
 │   │       └── resources/
@@ -272,7 +290,7 @@ GachiTa/
 
 `[김동민]`, `[서민수]`는 담당자 표시이며 실제 폴더명이나 파일명에 포함하지 않는다.
 
-Spring Boot 패키지명 `com.gachita`는 예시다. 실제 생성된 패키지명을 우선 사용한다.
+Spring Boot 패키지명은 현재 골격과 같은 `com.gachita`를 사용한다. 변경이 필요하면 공통 지시서와 함께 갱신한다.
 
 ---
 
@@ -284,7 +302,9 @@ Spring Boot 패키지명 `com.gachita`는 예시다. 실제 생성된 패키지�
 |---|---|---|
 | `package.json` | 김동민 | 라이브러리 추가 전 서로 공유 |
 | `src/app/_layout.tsx` | 김동민 | 서민수의 화면 경로 추가 시 협의 |
-| `src/services/api.ts` | 김동민 | API 주소와 공통 요청 방식 통일 |
+| `src/services/apiClient.ts` | 김동민 | API 주소와 공통 요청 방식 통일 |
+| `src/services/authStorage.ts` | 김동민 | 인증 토큰 저장 방식 공통 사용 |
+| `src/types/contracts.ts` | 공동 협의 | 공통 API 타입·상태 Enum을 한 곳에서 관리 |
 | 인증 상태 관리 | 김동민 | 서민수는 제공된 인증 정보를 재사용 |
 | `application.yml` | 김동민 | 서민수가 필요한 지도 설정은 협의 후 추가 |
 | Spring Boot 공통 설정 | 김동민 | CORS·인증 설정 공유 |

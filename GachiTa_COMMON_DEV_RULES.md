@@ -1,7 +1,8 @@
 # GachiTa 공통 개발 지시서
 
 **문서명:** `GachiTa_COMMON_DEV_RULES.md`  
-**버전:** v1.0  
+**버전:** v1.1  
+**이름·경로 정리일:** 2026-11-11  
 **적용 대상:** 팀원 A, 팀원 B 및 각 팀원이 사용하는 Codex  
 **기준 문서:** PRD v1.5 / 기능 정의서 v1.1 / 화면 설계서 v1.0
 
@@ -49,35 +50,42 @@
 
 # 3. 공통 폴더 구조
 
-기존 파일은 유지하면서 다음 구조를 기준으로 기능을 분리한다.
+기존 파일은 유지하면서 다음 구조를 기준으로 기능을 분리한다. `[예정]`은 아직 생성하지 않은 경로이며, 해당 기능 개발 시 아래 이름으로 생성한다.
 
 ```text
 GachiTa/
 ├── src/
 │   ├── app/                 # Expo Router 화면
 │   ├── components/          # 재사용 UI
-│   │   ├── common/
+│   │   ├── ui/
 │   │   ├── rooms/
 │   │   ├── boarding/
-│   │   ├── chat/
+│   │   ├── chat/             # [예정]
 │   │   ├── maps/
+│   │   ├── taxi/
 │   │   └── settlement/
 │   ├── features/            # 기능별 API 및 로직
 │   │   ├── auth/
 │   │   ├── rooms/
-│   │   ├── participation/
+│   │   ├── participation/    # [예정]
 │   │   ├── boarding/
 │   │   ├── chat/
 │   │   ├── maps/
 │   │   ├── taxi/
-│   │   └── settlement/
+│   │   ├── settlement/
+│   │   └── history/
 │   ├── services/
-│   │   ├── api.ts
-│   │   └── tokenStorage.ts
+│   │   ├── apiClient.ts
+│   │   └── authStorage.ts
 │   ├── contexts/
 │   │   └── AuthContext.tsx
 │   ├── types/
-│   │   └── contracts.ts
+│   │   ├── contracts.ts
+│   │   ├── auth.ts
+│   │   ├── room.ts
+│   │   ├── boarding.ts
+│   │   ├── map.ts
+│   │   └── settlement.ts
 │   └── constants/
 │       ├── routes.ts
 │       └── theme.ts
@@ -90,7 +98,7 @@ GachiTa/
 │       │   ├── room/
 │       │   ├── participation/
 │       │   ├── boarding/
-│       │   ├── chat/
+│       │   ├── chat/         # [예정]
 │       │   ├── map/
 │       │   ├── taxi/
 │       │   ├── settlement/
@@ -104,7 +112,28 @@ GachiTa/
 └── package.json
 ```
 
-Spring Boot의 실제 패키지명은 최초 생성 시 두 팀원이 합의한다. 위 `com.gachita`는 권장 예시이다.
+Spring Boot 패키지 경로는 현재 골격과 같은 `com.gachita`를 사용한다. 패키지명 변경은 두 팀원이 협의한다.
+
+## 3.1 통일된 파일·폴더 이름
+
+| 용도 | 기준 경로·이름 |
+|---|---|
+| 공통 UI | `src/components/ui/` |
+| 공통 HTTP 요청 | `src/services/apiClient.ts` |
+| 인증 토큰 저장 | `src/services/authStorage.ts` |
+| 공통 API 타입·상태 Enum | `src/types/contracts.ts` |
+| 기능별 타입 | `src/types/auth.ts`, `room.ts`, `boarding.ts`, `map.ts`, `settlement.ts` |
+| 방 상세 경로 | `src/app/rooms/[roomId]/index.tsx` |
+| 참여자 관리 화면 | `src/app/rooms/[roomId]/participants.tsx` |
+| 지도 선택 화면 | `src/app/map/picker.tsx` |
+| 지도 컴포넌트·로직 | `src/components/maps/`, `src/features/maps/` |
+| 정산 화면 | `src/app/rooms/[roomId]/settlement/`의 `index.tsx`, `amount.tsx`, `status.tsx`, `complete.tsx` |
+| 백엔드 정산 패키지 | `backend/src/main/java/com/gachita/settlement/` |
+| 백엔드 정산 클래스 | `SettlementController`, `SettlementService`, `SettlementRepository`, `SettlementRequest`, `SettlementResponse` |
+
+위 표는 [역할 분담표](docs/team_roles.md)의 경로에도 동일하게 적용한다. 화면 경로 `map/`, 지도 기능 폴더 `maps/`, 백엔드 패키지 `map/`은 계층별 기준 이름이다.
+
+현재 추가한 기능 파일과 `contracts.ts`는 빈 골격이다. `contracts.ts`에는 향후 공통 타입·상태 Enum을 정의하고, 기능별 타입 파일에서는 이를 재사용한다. 표에 적힌 백엔드 정산 클래스는 해당 기능 구현 시 생성한다.
 
 **주의:** 화면 경로인 `src/app`에 일반 API 함수나 비즈니스 로직을 무분별하게 작성하지 않는다.
 
@@ -542,7 +571,7 @@ DB 컬럼은 `snake_case`, Java·TypeScript 필드는 `camelCase`를 사용한�
 | `package.json` | 라이브러리 추가 전 공유 |
 | `package-lock.json` | 의존성 변경 시 함께 반영 |
 | `src/app/_layout.tsx` | 화면 경로 변경 시 협의 |
-| `src/services/api.ts` | API 통신 공통 함수 유지 |
+| `src/services/apiClient.ts` | API 통신 공통 함수 유지 |
 | `src/types/contracts.ts` | 공통 타입 및 Enum 관리 |
 | `src/constants/routes.ts` | 화면 이동 경로 통일 |
 | `src/contexts/AuthContext.tsx` | 사용자 인증 상태 공통 사용 |
