@@ -2,6 +2,13 @@
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
+## GachiTa 개발 문서
+
+- [공통 개발 지시서](GachiTa_COMMON_DEV_RULES.md): 기술·협업 규칙과 3.1절의 통일된 파일·폴더 이름
+- [역할 분담표](docs/team_roles.md): 김동민·서민수 담당 기능과 같은 기준의 프로젝트 경로
+
+기존 경로를 기준으로 `src/components/ui/`, `src/services/apiClient.ts`, `src/services/authStorage.ts`, `src/app/rooms/[roomId]/`, `src/app/map/`, 백엔드 `settlement/`를 사용합니다. 공통 타입·상태 Enum 파일은 `src/types/contracts.ts`입니다. 현재 기능 파일은 빈 골격이며, 문서의 `[예정]` 경로와 Java 클래스는 기능 개발 시 생성합니다.
+
 ## Get started
 
 1. Install dependencies
