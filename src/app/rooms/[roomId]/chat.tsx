@@ -48,6 +48,9 @@ export default function RoomChatScreen() {
         <View style={styles.summary}>
           <View style={styles.summaryTop}><Text style={styles.route}>{room.origin.name} → {room.destination.name}</Text><Text style={styles.count}>{room.participantCount}명 / {room.capacity}명</Text></View>
           <View style={styles.summaryTop}><Text style={styles.description}>예시 출발 {chatTime(room.departureAt)}</Text><Text style={styles.description}>나 · {room.hostUserId === DEMO_USER_ID ? '방장' : '참여자'}</Text></View>
+          <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/rooms/[roomId]/taxi', params: { roomId: String(room.roomId) } })} style={styles.taxiPreviewButton}>
+            <Text style={styles.taxiPreviewText}>가상 택시 시연 보기 →</Text>
+          </Pressable>
         </View>
         <Text style={styles.demoNotice}>메시지와 탑승 확인은 이 앱에서만 시연됩니다. 실제 요청은 다른 기기로 전송되지 않아요.</Text>
         <FlatList
@@ -85,6 +88,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   summary: { margin: 20, marginBottom: 10, padding: 15, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 9 },
   summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  taxiPreviewButton: { minHeight: 44, borderRadius: 10, backgroundColor: colors.primarySoft, justifyContent: 'center', alignItems: 'center', marginTop: 3 },
+  taxiPreviewText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   route: { color: colors.text, fontSize: 16, lineHeight: 24, fontWeight: '700' }, count: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   description: { color: colors.secondary, fontSize: 12, lineHeight: 20 },
   demoNotice: { paddingHorizontal: 20, marginBottom: 10, fontSize: 11, lineHeight: 18, color: colors.secondary },
