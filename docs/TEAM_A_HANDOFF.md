@@ -40,3 +40,5 @@
 - 실제 MySQL 연결, Android/iOS 실기기 쿠키/화면, B 기능을 포함한 전체 이용 흐름은 별도 통합 검증이 필요합니다.
 - 빈 B/P1 라우트의 default export 경고는 남아 있습니다. B의 브랜치를 병합할 때 경로·공통 타입·DB 설정 충돌을 검토합니다.
 - 김동민 P0 구현과 P1 예정 항목, 실제 동작과 디자인 preview를 구분합니다.
+
+CI 호환 보완: src/types/expo.d.ts가 Expo의 공식 전역/CSS 타입을 직접 참조하여 최초 체크아웃에서도 Expo 자동 생성 파일 없이 타입 검사를 수행합니다. 자동 생성 expo-env.d.ts와 .expo는 커밋하지 않습니다. GitHub Actions는 공식 현재 버전의 Node 24 기반 액션을 사용합니다.
