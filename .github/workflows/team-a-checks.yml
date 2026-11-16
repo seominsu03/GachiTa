@@ -39,4 +39,5 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: maven
-      - run: bash ./mvnw -B test
+      - name: Test backend
+        run: mvn -B --no-transfer-progress test

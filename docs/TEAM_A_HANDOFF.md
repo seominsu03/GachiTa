@@ -42,3 +42,5 @@
 - 김동민 P0 구현과 P1 예정 항목, 실제 동작과 디자인 preview를 구분합니다.
 
 CI 호환 보완: src/types/expo.d.ts가 Expo의 공식 전역/CSS 타입을 직접 참조하여 최초 체크아웃에서도 Expo 자동 생성 파일 없이 타입 검사를 수행합니다. 자동 생성 expo-env.d.ts와 .expo는 커밋하지 않습니다. GitHub Actions는 공식 현재 버전의 Node 24 기반 액션을 사용합니다.
+
+GitHub CI에서는 호스팅 러너에 제공되는 Maven CLI로 동일한 pom.xml 테스트를 실행하며, Windows 로컬 실행은 저장소의 Maven Wrapper를 유지합니다.
