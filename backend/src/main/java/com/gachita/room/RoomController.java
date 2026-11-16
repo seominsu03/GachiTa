@@ -20,4 +20,11 @@ public class RoomController {
     }
     @GetMapping("/mine") public ApiResponse<List<RoomResponse>> getMyRooms(Principal principal) { return ApiResponse.ok(rooms.getMyRooms(Long.valueOf(principal.getName())), "내 동승방을 조회했어요."); }
     @GetMapping("/{roomId}") public ApiResponse<RoomResponse> getRoomById(@PathVariable Long roomId) { return ApiResponse.ok(rooms.getRoomById(roomId), "택시방을 조회했어요."); }
+    @PatchMapping("/{roomId}/capacity") public ApiResponse<RoomResponse> updateRoomCapacity(@PathVariable Long roomId, Principal principal, @Valid @RequestBody RoomCapacityRequest input) {
+        return ApiResponse.ok(rooms.updateRoomCapacity(roomId, Long.valueOf(principal.getName()), input.capacity()), "모집 인원을 변경했어요.");
+    }
+    @DeleteMapping("/{roomId}") public ApiResponse<Void> deleteRoom(@PathVariable Long roomId, Principal principal) {
+        rooms.deleteRoom(roomId, Long.valueOf(principal.getName()));
+        return ApiResponse.ok(null, "택시방을 삭제했어요.");
+    }
 }

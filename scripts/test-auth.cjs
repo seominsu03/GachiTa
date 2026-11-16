@@ -117,3 +117,18 @@ test('room search maps Korean labels and omits empty/default conditions', () => 
   assert.throws(() => toDeparturePeriod('invalid'));
   assert.equal(roomSearchQuery({ origin: ' ', destination: '', period: 'ALL' }), '');
 });
+
+test('host room changes use PATCH and DELETE through the shared CSRF client', async () => {
+  const calls = [];
+  const { load } = loadAuthModules(async (url, options) => {
+    calls.push({ url, options });
+    return success(url.endsWith('/csrf') ? { token: 'token', headerName: 'X-CSRF-TOKEN' } : null);
+  });
+  const { updateRoomCapacity, deleteRoom } = load('features/rooms/api');
+  await updateRoomCapacity(12, 2); await deleteRoom(12);
+  assert.equal(calls[1].url, 'https://api.example.test/api/v1/rooms/12/capacity');
+  assert.equal(calls[1].options.method, 'PATCH');
+  assert.equal(calls[1].options.body, JSON.stringify({ capacity: 2 }));
+  assert.equal(calls[2].options.method, 'DELETE');
+  assert.equal(calls[2].options.headers['X-CSRF-TOKEN'], 'token');
+});

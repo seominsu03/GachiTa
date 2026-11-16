@@ -110,3 +110,10 @@ node --test scripts/test-auth.cjs
 현재 브랜치는 feature/auth-implementation이며 기존 미커밋 변경을 유지했습니다. A P0 업로드 대상은 feature/auth-implementation 브랜치입니다. main 병합은 팀원 검토 후 별도로 진행합니다.
 
 공식 참고: [Expo SDK 58](https://docs.expo.dev/versions/v58.0.0/), [Expo Router](https://docs.expo.dev/versions/v58.0.0/sdk/router/).
+
+
+## 방장 관리 기능 업데이트 받기
+
+feature/auth-implementation 브랜치의 최신 변경을 받은 뒤 실행 중인 백엔드와 Expo를 Ctrl+C로 종료하고 위 실행 명령으로 다시 시작합니다. 필요한 패키지를 바꾸지 않았으므로 이미 설치되어 있다면 의존성을 다시 설치할 필요는 없습니다.
+
+방장으로 로그인 → 내 정보/내 동승방 → 방 상세 또는 동승자 관리 → 모집 인원 수정 → 2·3·4명 선택 → 저장. 삭제는 택시방 삭제 → 삭제 확인을 눌러야 적용됩니다. 취소를 누르면 방이 유지됩니다. 일반 동승자에게는 방장 관리 버튼을 표시하지 않습니다.

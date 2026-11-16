@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { HostRoomControls } from './HostRoomControls';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { Brand, Button, Card, Field, Icon, Notice, Screen, ui } from '@/components/ui/DesignSystem';
 import { design as c } from '@/constants/design';
@@ -45,7 +46,7 @@ export function RoomListScreen({ rooms, navigate, onSearch, home = false, error,
   </Screen>;
 }
 
-export function RoomDetailScreen({ onRefresh, room, participations, userId, navigate, busy, error, onRequest, onCancel }: { room: Room; participations: Participation[]; userId: number; navigate: Navigate; busy?: boolean; error?: string | null; onRefresh?: () => void; onRequest: () => void; onCancel: (participationId: number) => void }) {
+export function RoomDetailScreen({ onUpdateCapacity, onDeleteRoom, onRefresh, room, participations, userId, navigate, busy, error, onRequest, onCancel }: { room: Room; participations: Participation[]; userId: number; navigate: Navigate; busy?: boolean; error?: string | null; onRefresh?: () => void; onUpdateCapacity?: (capacity: number) => Promise<void>; onDeleteRoom?: () => Promise<void>; onRequest: () => void; onCancel: (participationId: number) => void }) {
   const approved = participations.filter(p => p.status === 'APPROVED' || p.status === 'BOARDING_CONFIRMED');
   const own = participations.find(p => p.userId === userId && (p.status === 'PENDING' || p.status === 'APPROVED' || p.status === 'BOARDING_CONFIRMED'));
   const host = room.hostUserId === userId;
@@ -58,17 +59,19 @@ export function RoomDetailScreen({ onRefresh, room, participations, userId, navi
         : <><Text style={[ui.muted, { textAlign: 'center' }]}>동승 신청 후 방장의 승인을 기다려 주세요.{'\n'}승인 후 참여가 확정돼요.</Text><Button onPress={onRequest} busy={busy} disabled={timedOut || room.participantCount >= room.capacity || room.status !== 'RECRUITING'}>{timedOut ? '탑승 미응답으로 재참여할 수 없어요' : '동승 신청'}</Button></>}
   </View>}>
     <Text style={ui.badge}>{roomStatusLabels[room.status]}</Text><RoomSummary room={room} detailed /><CapacityCard room={room} />
+    {host && onUpdateCapacity && onDeleteRoom && <HostRoomControls room={room} busy={busy} onUpdate={onUpdateCapacity} onDelete={onDeleteRoom} />}
     <Text style={ui.heading}>방장 정보</Text><MemberRow member={room.host} badge="방장" />
     <View style={ui.between}><Text style={ui.heading}>동승자 정보</Text><Text style={ui.muted}>{approved.length}명 참여 중</Text></View>{approved.map(member => <MemberRow key={member.userId} member={member} />)}
     {(host || own?.status === 'APPROVED' || own?.status === 'BOARDING_CONFIRMED') && <Button secondary onPress={() => navigate('settlement', room.roomId)}>요금 및 정산</Button>}
   </Screen>;
 }
 
-export function ParticipantsScreen({ onRefresh, room, participations, navigate, busy, error, onApprove, onReject }: { room: Room; participations: Participation[]; navigate: Navigate; busy?: boolean; error?: string | null; onRefresh?: () => void; onApprove: (id: number) => void; onReject: (id: number) => void }) {
+export function ParticipantsScreen({ onUpdateCapacity, onDeleteRoom, onRefresh, room, participations, navigate, busy, error, onApprove, onReject }: { room: Room; participations: Participation[]; navigate: Navigate; busy?: boolean; error?: string | null; onRefresh?: () => void; onUpdateCapacity?: (capacity: number) => Promise<void>; onDeleteRoom?: () => Promise<void>; onApprove: (id: number) => void; onReject: (id: number) => void }) {
   const pending = participations.filter(p => p.status === 'PENDING'); const approved = participations.filter(p => p.status === 'APPROVED' || p.status === 'BOARDING_CONFIRMED');
   const [showChat, setShowChat] = useState(false);
   return <Screen title="동승자 관리" right={onRefresh && <Button secondary small onPress={onRefresh}>새로고침</Button>} contentGap={12} footer={<Button onPress={() => setShowChat(true)}>채팅</Button>}>
     <RoomSummary room={room} /><CapacityCard room={room} management />
+    {onUpdateCapacity && onDeleteRoom && <HostRoomControls room={room} busy={busy} onUpdate={onUpdateCapacity} onDelete={onDeleteRoom} />}
     <View style={ui.between}><Text style={ui.heading}>동승 신청자</Text><Text style={[ui.muted, ui.blue]}>{pending.length}명</Text></View>
     {error && <Notice error>{error}</Notice>}
     <View style={{ gap: 8 }}>{pending.map(member => <MemberRow key={member.participationId} member={member} dense><View style={{ gap: 4 }}><Button small busy={busy} disabled={room.status !== 'RECRUITING' || room.participantCount >= room.capacity} onPress={() => onApprove(member.participationId)}>수락</Button><Button small secondary disabled={busy || room.status !== 'RECRUITING'} onPress={() => onReject(member.participationId)}>거절</Button></View></MemberRow>)}</View>

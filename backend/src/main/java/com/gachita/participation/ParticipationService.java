@@ -27,7 +27,7 @@ public class ParticipationService {
         member.setStatus(ParticipationStatus.PENDING); return ParticipationResponse.from(members.save(member));
     }
     @Transactional(readOnly = true) public List<ParticipationResponse> getParticipations(Long roomId, Long userId) {
-        var room = rooms.findById(roomId).orElseThrow(() -> error(HttpStatus.NOT_FOUND, "ROOM_NOT_FOUND", "택시방이 없습니다."));
+        var room = rooms.findById(roomId).filter(value -> value.getStatus() != RoomStatus.CANCELLED).orElseThrow(() -> error(HttpStatus.NOT_FOUND, "ROOM_NOT_FOUND", "택시방이 없습니다."));
         return members.findByRoomRoomIdOrderByParticipationId(roomId).stream()
                 .filter(member -> room.getHost().getUserId().equals(userId) || member.getUser().getUserId().equals(userId) || member.getStatus() == ParticipationStatus.APPROVED || member.getStatus() == ParticipationStatus.BOARDING_CONFIRMED)
                 .map(ParticipationResponse::from).toList();
