@@ -96,3 +96,24 @@ test('settlement uses integer division and enforces safe input boundaries', () =
   assert.equal(bill.farePerPerson * bill.participantCount + bill.remainderFare, bill.totalFare);
   for (const [fare, count] of [[-1, 4], [0, 4], [1.5, 4], [10000001, 4], [24000, 0], [24000, 5]]) assert.throws(() => calculateSettlement(fare, count));
 });
+
+test('room search sends origin, destination and selected period together', async () => {
+  const calls = [];
+  const { load } = loadAuthModules(async url => { calls.push(url); return success([]); });
+  const { getRooms } = load('features/rooms/api');
+  await getRooms({ origin: ' 수원역 ', destination: ' 강남역 ', period: 'EVENING' });
+  assert.equal(calls[0], 'https://api.example.test/api/v1/rooms?destination=' + encodeURIComponent('강남역') + '&origin=' + encodeURIComponent('수원역') + '&period=EVENING');
+  await getRooms('강남역');
+  assert.equal(calls[1], 'https://api.example.test/api/v1/rooms?destination=' + encodeURIComponent('강남역'));
+});
+
+test('room search maps Korean labels and omits empty/default conditions', () => {
+  const { load } = loadAuthModules();
+  const { toDeparturePeriod, roomSearchQuery } = load('features/rooms/search');
+  assert.equal(toDeparturePeriod('오전'), 'MORNING');
+  assert.equal(toDeparturePeriod('오후'), 'AFTERNOON');
+  assert.equal(toDeparturePeriod('저녁'), 'EVENING');
+  assert.equal(toDeparturePeriod(), 'ALL');
+  assert.throws(() => toDeparturePeriod('invalid'));
+  assert.equal(roomSearchQuery({ origin: ' ', destination: '', period: 'ALL' }), '');
+});

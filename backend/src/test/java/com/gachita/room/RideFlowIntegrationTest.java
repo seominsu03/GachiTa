@@ -7,6 +7,10 @@ import com.gachita.settlement.SettlementRepository;
 import com.gachita.user.*;
 import java.time.Instant;
 import java.util.List;
+import java.util.ArrayList;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -208,6 +212,57 @@ class RideFlowIntegrationTest {
                 .andExpect(status().isNotFound());
         assertThat(members.findById(request.participationId()).orElseThrow().getStatus()).isEqualTo(ParticipationStatus.PENDING);
         assertThat(roomService.getRoomById(room.roomId()).participantCount()).isEqualTo(1);
+    }
+
+
+    private Instant departure(LocalTime time) {
+        return LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(2).atTime(time).atZone(ZoneId.of("Asia/Seoul")).toInstant();
+    }
+    private RoomCreateRequest searchInput(String origin, Instant departureAt) {
+        return new RoomCreateRequest(new LocationInfo(origin, 37.2657, 127.0007),
+                new LocationInfo("강남역", 37.4979, 127.0276), departureAt, 4);
+    }
+    @Test void searchFiltersOriginAndPeriodBeforeTakingHundredRows() throws Exception {
+        var fixtures = new ArrayList<TaxiRoom>();
+        for (int i = 0; i < 100; i++) fixtures.add(new TaxiRoom(host, searchInput("서울역", departure(LocalTime.of(8, 0)).plusSeconds(i))));
+        rooms.saveAllAndFlush(fixtures);
+        var target = roomService.createRoom(host.getUserId(), searchInput("수원역", departure(LocalTime.of(19, 0))));
+        mvc.perform(get("/api/v1/rooms").param("destination", "강남").with(user(as(first))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(100));
+        // The only match is the 101st room in the old destination-only result set.
+        mvc.perform(get("/api/v1/rooms").param("destination", "강남").param("origin", " 수원 ").param("period", "EVENING").with(user(as(first))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].roomId").value(target.roomId()));
+        mvc.perform(get("/api/v1/rooms").param("destination", "강남").param("origin", "수원").with(user(as(first))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].roomId").value(target.roomId()));
+        mvc.perform(get("/api/v1/rooms").param("destination", "강남").param("period", "EVENING").with(user(as(first))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].roomId").value(target.roomId()));
+    }
+    @Test void searchUsesKoreanMidnightNoonAndEveningBoundaries() throws Exception {
+        var midnight = roomService.createRoom(host.getUserId(), searchInput("수원역", departure(LocalTime.MIDNIGHT)));
+        var beforeNoon = roomService.createRoom(host.getUserId(), searchInput("수원역", departure(LocalTime.of(11, 59, 59))));
+        var noon = roomService.createRoom(host.getUserId(), searchInput("수원역", departure(LocalTime.NOON)));
+        var beforeEvening = roomService.createRoom(host.getUserId(), searchInput("수원역", departure(LocalTime.of(17, 59, 59))));
+        var evening = roomService.createRoom(host.getUserId(), searchInput("수원역", departure(LocalTime.of(18, 0))));
+        var beforeMidnight = roomService.createRoom(host.getUserId(), searchInput("수원역", departure(LocalTime.of(23, 59, 59))));
+        for (var entry : java.util.Map.of("MORNING", List.of(midnight.roomId(), beforeNoon.roomId()),
+                "AFTERNOON", List.of(noon.roomId(), beforeEvening.roomId()),
+                "EVENING", List.of(evening.roomId(), beforeMidnight.roomId())).entrySet()) {
+            var response = mvc.perform(get("/api/v1/rooms").param("origin", "수원").param("period", entry.getKey()).with(user(as(first))))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+            var actual = new ArrayList<Long>();
+            json.readTree(response).get("data").forEach(room -> actual.add(room.get("roomId").asLong()));
+            assertThat(actual).containsExactlyElementsOf(entry.getValue());
+        }
+    }
+    @Test void searchRejectsUnknownPeriodAndTreatsNamesAsLiteralSubstrings() throws Exception {
+        var target = roomService.createRoom(host.getUserId(), searchInput("수원%_역", departure(LocalTime.NOON)));
+        roomService.createRoom(host.getUserId(), searchInput("수원역", departure(LocalTime.NOON)));
+        mvc.perform(get("/api/v1/rooms").param("period", "invalid").with(user(as(first))))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
+        mvc.perform(get("/api/v1/rooms").param("origin", "%_").param("period", "ALL").with(user(as(first))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].roomId").value(target.roomId()));
     }
 
 }

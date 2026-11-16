@@ -44,3 +44,5 @@
 CI 호환 보완: src/types/expo.d.ts가 Expo의 공식 전역/CSS 타입을 직접 참조하여 최초 체크아웃에서도 Expo 자동 생성 파일 없이 타입 검사를 수행합니다. 자동 생성 expo-env.d.ts와 .expo는 커밋하지 않습니다. GitHub Actions는 공식 현재 버전의 Node 24 기반 액션을 사용합니다.
 
 GitHub CI에서는 호스팅 러너에 제공되는 Maven CLI로 동일한 pom.xml 테스트를 실행하며, Windows 로컬 실행은 저장소의 Maven Wrapper를 유지합니다.
+
+PR #5 추가 검색 계약: GET /api/v1/rooms의 선택 query origin과 period(ALL/MORNING/AFTERNOON/EVENING)를 도입했습니다. 기존 destination 요청과 응답 타입은 유지합니다. 한국 시간 기준을 포함한 정확한 조건은 API_SPEC.md의 검색 누락 수정 절을 참고합니다.

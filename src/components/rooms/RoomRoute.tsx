@@ -7,6 +7,7 @@ import { SettlementScreen, type SettlementStage } from '@/components/settlement/
 import { useAuth } from '@/contexts/AuthContext';
 import { useRemote } from '@/hooks/use-remote';
 import * as rooms from '@/features/rooms/api';
+import { toDeparturePeriod } from '@/features/rooms/search';
 import * as participation from '@/features/participation/api';
 import * as settlement from '@/features/settlement/api';
 import { ApiError } from '@/services/apiClient';
@@ -27,9 +28,9 @@ export const navigateRoom: Navigate = (screen, roomId, search) => {
 
 export function RoomsRoute({ home = false }: { home?: boolean }) {
   const params = useLocalSearchParams<{ origin?: string; destination?: string; period?: string }>();
-  const destination = params.destination ?? '';
+  const destination = params.destination ?? ''; const origin = params.origin ?? ''; const period = params.period ?? '전체';
   const { user } = useAuth(); const userId = user?.userId;
-  const load = useCallback(() => userId ? rooms.getRooms(destination) : Promise.resolve([]), [destination, userId]); const remote = useRemote(load);
+  const load = useCallback(() => userId ? rooms.getRooms({ origin, destination, period: toDeparturePeriod(period) }) : Promise.resolve([]), [origin, destination, period, userId]); const remote = useRemote(load);
   return <RoomListScreen key={`${params.origin ?? ''}-${destination}-${params.period ?? ''}`} home={home} onSearch={filter => router.setParams(filter)} rooms={remote.data ?? []} navigate={navigateRoom} initialSearch={params} error={remote.error} loading={remote.loading} refresh={() => void remote.refresh()} />;
 }
 

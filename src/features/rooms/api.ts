@@ -1,8 +1,10 @@
 import { apiRequest } from '@/services/apiClient';
-import type { Room, RoomCreateRequest } from '@/types/room';
+import type { Room, RoomCreateRequest, RoomSearchParams } from '@/types/room';
+import { roomSearchQuery } from '@/features/rooms/search';
 
-export function getRooms(destination = '') {
-  return apiRequest<Room[]>(`/api/v1/rooms${destination ? `?destination=${encodeURIComponent(destination)}` : ''}`);
+// Retain getRooms('destination') compatibility for existing callers.
+export function getRooms(input: string | RoomSearchParams = '') {
+  return apiRequest<Room[]>(`/api/v1/rooms${roomSearchQuery(input)}`);
 }
 export function searchRoomsByDestination(destination: string) { return getRooms(destination); }
 export function getMyRooms() { return apiRequest<Room[]>('/api/v1/rooms/mine'); }

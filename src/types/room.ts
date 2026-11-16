@@ -8,3 +8,6 @@ export type Room = {
 };
 export type RoomCreateRequest = { origin: LocationInfo; destination: LocationInfo; departureAt: string; capacity: number };
 export type Participation = Member & { participationId: number; roomId: number; status: ParticipationStatus };
+
+export type DeparturePeriod = 'ALL' | 'MORNING' | 'AFTERNOON' | 'EVENING';
+export type RoomSearchParams = { origin?: string; destination?: string; period?: DeparturePeriod };

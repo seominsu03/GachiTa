@@ -124,3 +124,17 @@ GET /api/v1/rooms/mine은 요청 userId가 아닌 인증된 principal의 ID로 �
 - 가상 운행과 SETTLING 전환은 서민수 담당 연결 지점입니다. 일반 클라이언트가 방 상태를 임의로 바꾸는 API는 제공하지 않습니다.
 
 2026-11-16 보완: totalFare와 capacity에 소수 JSON 숫자를 보내면 자동 버림하지 않고 INVALID_INPUT(400)으로 거절합니다. 정산의 최대 허용 금액 10,000,000원은 화면에서도 쉼표 포함 10자리까지 입력할 수 있습니다.
+
+## PR #5 검색 누락 수정
+
+GET /api/v1/rooms는 기존 destination 조건에 선택 조건 origin과 period를 추가합니다. 기존 목적지 단독 요청은 그대로 동작합니다.
+
+- origin/destination: 앞뒤 공백 제거, 대소문자 무시 부분 일치. %와 _는 일반 문자입니다.
+- period: ALL(기본), MORNING, AFTERNOON, EVENING. 잘못된 값은 INVALID_INPUT(400)입니다.
+- 한국 시간(Asia/Seoul) 기준: MORNING 00:00 이상 12:00 미만, AFTERNOON 12:00 이상 18:00 미만, EVENING 18:00 이상 24:00 미만입니다. 날짜 제한은 추가하지 않습니다.
+- 모집 상태·미래 출발·출발지·목적지·시간대 조건을 DB에서 먼저 모두 적용한 뒤, departureAt과 roomId 오름차순으로 최대 100개를 반환합니다.
+- 화면은 모든 검색 조건을 서버에 보내며 서버 결과를 다시 잘라내지 않습니다. 디자인 preview의 샘플 데이터 필터는 별도입니다.
+
+예시: GET /api/v1/rooms?origin=수원&destination=강남&period=EVENING
+
+클라이언트 getRooms('강남') 호환을 유지하며 getRooms({origin:'수원',destination:'강남',period:'EVENING'})도 지원합니다. 화면의 전체/오전/오후/저녁은 API 코드로 변환합니다. 공통 계약 변경은 이번 PR 검토 항목입니다.

@@ -54,3 +54,16 @@ ALTER USER 'gachita'@'localhost' IDENTIFIED BY 'APP_PASSWORD_PLACEHOLDER';
 ## GitHub에 포함하는 것
 
 설치 절차, 비밀번호가 없는 설정 예시, 스키마 생성 SQL과 접속 확인 기록을 공유합니다. PC에 설치한 Windows 서비스, 실제 MySQL 계정·데이터·비밀번호와 PowerShell의 DB_PASSWORD 환경 변수는 GitHub에 올리지 않습니다. 다른 개발자는 자신의 PC에서 MySQL과 로컬 계정을 설정해야 합니다.
+## 실제 MySQL 자동 검증
+
+프로젝트 루트 PowerShell에서 실행합니다. 비밀번호는 채팅에 보내지 않고 해당 창의 보안 입력으로만 입력합니다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-mysql.ps1
+```
+
+이 스크립트는 실제 gachita MySQL DB를 dev 프로필에 연결합니다. 기존 테이블을 삭제하지 않고 시험 계정 1개와 방 3개를 생성하므로 테스트 기록은 로컬 DB에 남습니다. 별도 18080 포트를 사용하여 본인이 시작한 검증 서버 프로세스만 종료·재시작합니다. 앱 계정의 DB 비밀번호는 명령 인수나 파일에 저장하지 않습니다.
+
+검사 순서: 패키지 빌드 → MySQL dev 서버 시작 및 JPA 스키마 검증 → 실제 HTTP 회원가입·방 생성·한국 시간 검색 → JVM 서버 프로세스 종료/재시작 → 재로그인·사용자/방 데이터 유지 확인. JPA가 users/taxi_rooms/participations/settlements/settlement_receipts를 검증합니다.
+
+성공 결과는 무시되는 .expo/mysql-persistence-report.json에 저장됩니다. 서버 로그는 .expo/mysql-before-restart.log와 .expo/mysql-after-restart.log에 남습니다. 실패 시 로그의 오류 원인을 확인하며 완료하지 않은 항목을 성공으로 보고하지 않습니다. 이 결과와 비밀번호를 저장소에 자동 업로드하지 않습니다.

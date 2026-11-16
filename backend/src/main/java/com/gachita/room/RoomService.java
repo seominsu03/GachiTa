@@ -19,7 +19,13 @@ public class RoomService {
         return RoomResponse.from(rooms.save(new TaxiRoom(user, input)));
     }
     @Transactional(readOnly = true) public List<RoomResponse> getRooms(String destination) {
-        return rooms.search(RoomStatus.RECRUITING, destination.trim(), PageRequest.of(0, 100)).stream().map(RoomResponse::from).toList();
+        return getRooms("", destination, "ALL");
+    }
+    @Transactional(readOnly = true) public List<RoomResponse> getRooms(String origin, String destination, String period) {
+        var departurePeriod = DeparturePeriod.parse(period);
+        return rooms.search(RoomStatus.RECRUITING, origin.strip(), destination.strip(),
+                departurePeriod.startHour(), departurePeriod.endHour(), PageRequest.of(0, 100))
+                .stream().map(RoomResponse::from).toList();
     }
     @Transactional(readOnly = true) public List<RoomResponse> getMyRooms(Long userId) {
         return rooms.findMyRooms(userId, List.of(ParticipationStatus.PENDING, ParticipationStatus.APPROVED, ParticipationStatus.BOARDING_CONFIRMED), PageRequest.of(0, 100))
