@@ -1,3 +1,4 @@
+param([switch]$CheckJavaOnly)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $backendPath = Join-Path $projectRoot 'backend'
@@ -8,6 +9,35 @@ $previousUrl = $env:DB_URL
 $previousUsername = $env:DB_USERNAME
 $previousApi = $env:GACHITA_VERIFY_API_URL
 $serverProcess = $null
+# Resolve a real JDK 21 directory before asking for a database password.
+$javaCandidates = @($env:JAVA_HOME)
+$javaBase = Join-Path $env:ProgramFiles 'Java'
+if (Test-Path -LiteralPath $javaBase) {
+    $javaCandidates += Get-ChildItem -LiteralPath $javaBase -Directory -Filter 'jdk-21*' | Sort-Object Name -Descending | Select-Object -ExpandProperty FullName
+}
+$resolvedJavaHome = $null
+foreach ($candidate in $javaCandidates) {
+    if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+    try {
+        $normalized = (Resolve-Path -LiteralPath $candidate.Trim('"') -ErrorAction Stop).ProviderPath
+        $candidateCompiler = Join-Path $normalized 'bin\javac.exe'
+        if (-not (Test-Path -LiteralPath $candidateCompiler)) { continue }
+        $compilerVersion = (& $candidateCompiler -version 2>&1 | Out-String).Trim()
+        if ($LASTEXITCODE -eq 0 -and $compilerVersion -match '^javac 21(\.|$)') { $resolvedJavaHome = $normalized; break }
+    } catch { continue }
+}
+if (-not $resolvedJavaHome) { throw 'JDK 21 was not found. Set JAVA_HOME to the installed JDK 21 directory.' }
+$env:JAVA_HOME = $resolvedJavaHome
+$javaPath = Join-Path $resolvedJavaHome 'bin\java.exe'
+Write-Host ('PASS: JDK 21 found at ' + $resolvedJavaHome)
+if ($CheckJavaOnly) {
+    Push-Location $backendPath
+    try {
+        & .\mvnw.cmd --version
+        if ($LASTEXITCODE -ne 0) { throw 'Maven Wrapper Java preflight failed.' }
+    } finally { Pop-Location }
+    return
+}
 Write-Host 'Verify local MySQL: creates one test account and three rooms, restarts its own server, checks persistence.'
 Write-Host 'Existing application data is kept. Test records remain in your local database.'
 $secret = Read-Host 'Enter the gachita database account password (not root)' -AsSecureString
