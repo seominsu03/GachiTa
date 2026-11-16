@@ -1,0 +1,10 @@
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
+spring:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql,classpath:db/migrations/20261111_room_settlement.sql
