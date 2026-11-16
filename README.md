@@ -1,63 +1,36 @@
-# Welcome to your Expo app 👋
+# 같이타(GachiTa)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+같은 방향의 동승자를 찾아 택시비를 나누는 Expo/React Native + Spring Boot 앱입니다.
 
-## GachiTa 개발 문서
+김동민 담당 P0인 회원관리·택시방·참여 신청·정산은 프론트엔드와 서버 코드가 있습니다. 회원가입부터 동승 승인까지는 로컬 실행으로 확인할 수 있습니다. 채팅·탑승 확인·지도·가상 운행 연결과 실제 MySQL·모바일 기기 검증이 남아 있어 전체 MVP 완료 상태는 아닙니다.
 
-- [공통 개발 지시서](GachiTa_COMMON_DEV_RULES.md): 기술·협업 규칙과 3.1절의 통일된 파일·폴더 이름
-- [역할 분담표](docs/team_roles.md): 김동민·서민수 담당 기능과 같은 기준의 프로젝트 경로
+- [바로 실행하기: MySQL 없는 데모와 MySQL 개발 환경](docs/RUN_GUIDE.md)
+- [진행 상황과 실제 검증 범위](docs/IMPLEMENTATION_STATUS.md)
+- [서버 API](docs/API_SPEC.md)
+- [A 담당 구현 및 B 연결 안내](docs/TEAM_A_HANDOFF.md)
+- [구현 화면](docs/SCREEN_MAP.md)
+- [김동민·서민수 역할 분담](docs/team_roles.md)
+- [공통 개발 규칙](GachiTa_COMMON_DEV_RULES.md)
 
-기존 경로를 기준으로 `src/components/ui/`, `src/services/apiClient.ts`, `src/services/authStorage.ts`, `src/app/rooms/[roomId]/`, `src/app/map/`, 백엔드 `settlement/`를 사용합니다. 공통 타입·상태 Enum 파일은 `src/types/contracts.ts`입니다. 현재 기능 파일은 빈 골격이며, 문서의 `[예정]` 경로와 Java 클래스는 기능 개발 시 생성합니다.
+실제 작업 폴더는 이 README가 있는 저장소입니다. 바탕 화면의 별도 Gachita 정적 웹 골격과 혼용하지 않습니다.
 
-## Get started
+## 기술 구성
 
-1. Install dependencies
+- Expo SDK 58, React Native, TypeScript, Expo Router
+- Java 21, Spring Boot 3.5.16, Spring Security, JPA
+- MySQL(개발/운영), H2(테스트/로컬 일회성 데모)
+- 세션 쿠키 인증, 변경 요청의 CSRF 검증, 공통 REST API 응답
 
-   ```bash
-   npm install
-   ```
+## 검사
 
-2. Start the app
+프로젝트 루트에서:
 
-   ```bash
-   npx expo start
-   ```
+~~~powershell
+npx tsc --noEmit
+npx expo lint
+node --test scripts/test-auth.cjs
+cd backend
+.\mvnw.cmd test
+~~~
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+경로·상태·API 이름은 공통 개발 규칙을 따릅니다. 서민수 담당 화면은 해당 팀원이 구현한 뒤 연결해야 하며, 임시 데이터 화면인 /preview는 실제 서버 데이터와 분리되어 있습니다.

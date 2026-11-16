@@ -1,0 +1,2 @@
+package com.gachita.room;
+public enum RoomStatus { RECRUITING, BOARDING_CHECK, TAXI_CALLING, TAXI_ASSIGNED, IN_RIDE, SETTLING, COMPLETED }
