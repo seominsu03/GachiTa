@@ -64,6 +64,8 @@ node scripts/smoke-ride-api.cjs
 
 ## 4. 영구 저장: MySQL 개발 환경
 
+Windows 설치와 DB·계정 접속 확인 기록은 [MYSQL_SETUP.md](MYSQL_SETUP.md)를 참고합니다.
+
 MySQL에 gachita DB와 전용 계정을 먼저 준비합니다. 기존 DB는 백업·스키마 비교 후 사용하며 삭제하지 않습니다.
 
 ~~~powershell
