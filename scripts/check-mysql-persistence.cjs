@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const base = process.env.GACHITA_VERIFY_API_URL || 'http://localhost:18080';
+const base = process.env.GACHITA_VERIFY_API_URL || 'http://127.0.0.1:18080';
 const stateFile = path.join(__dirname, '..', '.expo', 'mysql-persistence.json');
 if (!['localhost', '127.0.0.1'].includes(new URL(base).hostname)) throw Error('Only a local verification server is supported.');
 let cookie = '';

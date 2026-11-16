@@ -44,19 +44,17 @@ $secret = Read-Host 'Enter the gachita database account password (not root)' -As
 $env:DB_PASSWORD = [System.Net.NetworkCredential]::new('', $secret).Password
 $env:DB_USERNAME = 'gachita'
 $env:DB_URL = 'jdbc:mysql://localhost:3306/gachita?serverTimezone=UTC&characterEncoding=UTF-8'
-$env:GACHITA_VERIFY_API_URL = 'http://localhost:18080'
-if (-not $env:JAVA_HOME) { $env:JAVA_HOME = 'C:\Program Files\Java\jdk-21.0.12.1' }
-$javaPath = Join-Path $env:JAVA_HOME 'bin/java.exe'
+$env:GACHITA_VERIFY_API_URL = 'http://127.0.0.1:18080'
 function Start-VerificationServer([string]$name) {
     $jarPath = Join-Path $backendPath 'target/gachita-backend-0.0.1-SNAPSHOT.jar'
     $outPath = Join-Path $logDirectory ($name + '.log')
     $errorPath = Join-Path $logDirectory ($name + '-error.log')
-    $process = Start-Process -FilePath $javaPath -ArgumentList @('-jar', ('"' + $jarPath + '"'), '--spring.profiles.active=dev', '--server.address=127.0.0.1', '--server.port=18080') -WorkingDirectory $backendPath -WindowStyle Hidden -RedirectStandardOutput $outPath -RedirectStandardError $errorPath -PassThru
+    $process = Start-Process -FilePath $javaPath -ArgumentList @('-jar', ('"' + $jarPath + '"'), '--spring.profiles.active=dev', '--server.address=127.0.0.1', '--server.port=18080', '--debug=false', '--logging.level.org.hibernate.SQL=WARN') -WorkingDirectory $backendPath -WindowStyle Hidden -RedirectStandardOutput $outPath -RedirectStandardError $errorPath -PassThru
     try {
         for ($attempt = 0; $attempt -lt 90; $attempt++) {
             if ($process.HasExited) { throw ('Server failed. Check ' + $outPath + ' and ' + $errorPath) }
             try {
-                $response = Invoke-WebRequest -Uri ($env:GACHITA_VERIFY_API_URL + '/api/v1/auth/csrf') -UseBasicParsing -TimeoutSec 1
+                $response = Invoke-WebRequest -Uri ($env:GACHITA_VERIFY_API_URL + '/api/v1/auth/csrf') -UseBasicParsing -TimeoutSec 5
                 if ($response.StatusCode -eq 200) { Write-Host ('PASS: dev server started, PID ' + $process.Id + ', JPA validated MySQL tables'); return $process }
             } catch { }
             Start-Sleep -Milliseconds 500
