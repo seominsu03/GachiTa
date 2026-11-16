@@ -10,3 +10,6 @@ export function searchRoomsByDestination(destination: string) { return getRooms(
 export function getMyRooms() { return apiRequest<Room[]>('/api/v1/rooms/mine'); }
 export function getRoomById(roomId: number) { return apiRequest<Room>(`/api/v1/rooms/${roomId}`); }
 export function createRoom(input: RoomCreateRequest) { return apiRequest<Room>('/api/v1/rooms', { method: 'POST', body: input }); }
+
+export function updateRoomCapacity(roomId: number, capacity: number) { return apiRequest<Room>(`/api/v1/rooms/${roomId}/capacity`, { method: 'PATCH', body: { capacity } }); }
+export function deleteRoom(roomId: number) { return apiRequest<null>(`/api/v1/rooms/${roomId}`, { method: 'DELETE' }); }

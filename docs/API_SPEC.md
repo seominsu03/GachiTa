@@ -138,3 +138,15 @@ GET /api/v1/rooms는 기존 destination 조건에 선택 조건 origin과 period
 예시: GET /api/v1/rooms?origin=수원&destination=강남&period=EVENING
 
 클라이언트 getRooms('강남') 호환을 유지하며 getRooms({origin:'수원',destination:'강남',period:'EVENING'})도 지원합니다. 화면의 전체/오전/오후/저녁은 API 코드로 변환합니다. 공통 계약 변경은 이번 PR 검토 항목입니다.
+
+
+## 방장 정원 변경 및 방 삭제
+
+- PATCH /api/v1/rooms/{roomId}/capacity, 요청 {"capacity":2}, 응답은 기존 RoomResponse입니다.
+- DELETE /api/v1/rooms/{roomId}, 성공 응답 data는 null입니다.
+- 두 요청 모두 세션·CSRF 인증과 방장 권한을 확인하고, 참여 승인과 같은 방 행 잠금을 사용합니다.
+- 정원은 방장 포함 2~4명입니다. 정원 변경은 출발 시간이 지나지 않은 RECRUITING 방에서만 가능하며 현재 확정 인원보다 줄이면 CAPACITY_BELOW_PARTICIPANTS(409)입니다. 대기 신청은 확정 인원에 포함하지 않습니다.
+- 삭제는 RECRUITING 방에서만 허용합니다. 출발 시간이 지난 모집방도 정리할 수 있습니다. 탑승 확인·운행·정산 단계에서는 변경과 삭제를 차단합니다.
+- 삭제는 RoomStatus.CANCELLED로 표시하는 논리 삭제입니다. 활성 참여 신청은 ParticipationStatus.CANCELLED로 전환하고 방을 검색·내 동승방에서 제외합니다. 상세 및 참여 목록은 404를 반환합니다. 물리 기록과 외래 키는 보존합니다.
+- 공통 RoomStatus에 CANCELLED를 추가했습니다. 현재 MySQL 스키마의 status VARCHAR(30)은 그대로 사용하며 신규 컬럼이나 테이블은 추가하지 않습니다. 다른 환경에서 native ENUM 스키마를 따로 사용한다면 허용 상태를 검토해야 합니다.
+- 실제 요금은 정원(capacity)이 아닌 확정된 탑승 인원으로 나눕니다. 예: 정원 4명, 실제 방장+동승자 2명이면 24,000원은 1인 12,000원입니다.

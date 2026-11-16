@@ -265,4 +265,86 @@ class RideFlowIntegrationTest {
                 .andExpect(jsonPath("$.data[0].roomId").value(target.roomId()));
     }
 
+
+    @Test void hostCanChangeCapacityButCannotShrinkBelowApprovedMembers() throws Exception {
+        var room = create(4);
+        String path = "/api/v1/rooms/" + room.roomId() + "/capacity";
+        mvc.perform(patch(path).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"capacity\":2}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.capacity").value(2));
+        var firstRequest = participation.requestParticipation(room.roomId(), first.getUserId());
+        participation.change(room.roomId(), firstRequest.participationId(), host.getUserId(), ParticipationStatus.APPROVED);
+        mvc.perform(patch(path).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"capacity\":3}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.capacity").value(3));
+        var secondRequest = participation.requestParticipation(room.roomId(), second.getUserId());
+        participation.change(room.roomId(), secondRequest.participationId(), host.getUserId(), ParticipationStatus.APPROVED);
+        mvc.perform(patch(path).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"capacity\":2}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("CAPACITY_BELOW_PARTICIPANTS"));
+        for (var capacity : List.of(1, 5, 2.5)) mvc.perform(patch(path).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(java.util.Map.of("capacity",capacity))))
+                .andExpect(status().isBadRequest());
+        assertThat(roomService.getRoomById(room.roomId()).capacity()).isEqualTo(3);
+    }
+
+    @Test void onlyHostCanChangeCapacityOrDeleteRoom() throws Exception {
+        var room = create(4); String path = "/api/v1/rooms/" + room.roomId();
+        mvc.perform(patch(path + "/capacity").with(user(as(first))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"capacity\":2}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(delete(path).with(user(as(first))).with(csrf())).andExpect(status().isForbidden());
+        assertThat(roomService.getRoomById(room.roomId()).capacity()).isEqualTo(4);
+        assertThat(roomService.getRoomById(room.roomId()).status()).isEqualTo(RoomStatus.RECRUITING);
+    }
+
+    @Test void deletingRoomCancelsApplicationsAndHidesRoomFromAllLists() throws Exception {
+        var room = create(4); String path = "/api/v1/rooms/" + room.roomId();
+        var approved = participation.requestParticipation(room.roomId(), first.getUserId());
+        participation.change(room.roomId(), approved.participationId(), host.getUserId(), ParticipationStatus.APPROVED);
+        participation.requestParticipation(room.roomId(), second.getUserId());
+        mvc.perform(delete(path).with(user(as(host))).with(csrf())).andExpect(status().isOk());
+        assertThat(rooms.findById(room.roomId()).orElseThrow().getStatus()).isEqualTo(RoomStatus.CANCELLED);
+        assertThat(members.findByRoomRoomIdOrderByParticipationId(room.roomId())).extracting(Participation::getStatus)
+                .containsOnly(ParticipationStatus.CANCELLED);
+        mvc.perform(get(path).with(user(as(host)))).andExpect(status().isNotFound());
+        mvc.perform(get(path + "/participations").with(user(as(first)))).andExpect(status().isNotFound());
+        for (var viewer : List.of(host, first, second)) mvc.perform(get("/api/v1/rooms/mine").with(user(as(viewer))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
+        mvc.perform(get("/api/v1/rooms").with(user(as(first)))).andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
+        mvc.perform(post(path + "/participations").with(user(as(first))).with(csrf())).andExpect(status().isConflict());
+    }
+
+    @Test void boardingRideAndSettlementRoomsCannotBeEditedOrDeleted() throws Exception {
+        for (var stage : List.of(RoomStatus.BOARDING_CHECK, RoomStatus.TAXI_CALLING, RoomStatus.TAXI_ASSIGNED, RoomStatus.IN_RIDE, RoomStatus.SETTLING, RoomStatus.COMPLETED)) {
+            var room = create(4);
+            var entity = rooms.findById(room.roomId()).orElseThrow(); entity.setStatus(stage); rooms.saveAndFlush(entity);
+            String path = "/api/v1/rooms/" + room.roomId();
+            mvc.perform(patch(path + "/capacity").with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"capacity\":2}"))
+                    .andExpect(status().isConflict());
+            mvc.perform(delete(path).with(user(as(host))).with(csrf())).andExpect(status().isConflict());
+            assertThat(rooms.findById(room.roomId()).orElseThrow().getStatus()).isEqualTo(stage);
+        }
+    }
+
+    @Test void settlementUsesActualRidersEvenWhenCapacityIsFour() throws Exception {
+        var room = create(4);
+        var request = participation.requestParticipation(room.roomId(), first.getUserId());
+        participation.change(room.roomId(), request.participationId(), host.getUserId(), ParticipationStatus.APPROVED);
+        var entity = rooms.findById(room.roomId()).orElseThrow(); entity.setStatus(RoomStatus.SETTLING); rooms.saveAndFlush(entity);
+        mvc.perform(post("/api/v1/rooms/" + room.roomId() + "/settlement").with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"totalFare\":24000}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.data.participantCount").value(2))
+                .andExpect(jsonPath("$.data.farePerPerson").value(12000));
+    }
+
+    @Test void simultaneousCapacityReductionAndApprovalCannotOverfillRoom() throws Exception {
+        var room = create(3);
+        var a = participation.requestParticipation(room.roomId(), first.getUserId());
+        participation.change(room.roomId(), a.participationId(), host.getUserId(), ParticipationStatus.APPROVED);
+        var b = participation.requestParticipation(room.roomId(), second.getUserId());
+        var start = new CountDownLatch(1); var executor = Executors.newFixedThreadPool(2);
+        try {
+            var shrink = executor.submit(() -> { start.await(); try { roomService.updateRoomCapacity(room.roomId(),host.getUserId(),2); return true; } catch (ApiException e) { assertThat(e.getCode()).isEqualTo("CAPACITY_BELOW_PARTICIPANTS"); return false; } });
+            var approve = executor.submit(() -> { start.await(); try { participation.change(room.roomId(),b.participationId(),host.getUserId(),ParticipationStatus.APPROVED); return true; } catch (ApiException e) { assertThat(e.getCode()).isEqualTo("ROOM_FULL"); return false; } });
+            start.countDown();
+            assertThat((shrink.get(10,TimeUnit.SECONDS) ? 1 : 0) + (approve.get(10,TimeUnit.SECONDS) ? 1 : 0)).isEqualTo(1);
+            var result = roomService.getRoomById(room.roomId()); assertThat(result.participantCount()).isLessThanOrEqualTo(result.capacity());
+        } finally { executor.shutdownNow(); }
+    }
+
 }

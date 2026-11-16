@@ -46,3 +46,12 @@ CI 호환 보완: src/types/expo.d.ts가 Expo의 공식 전역/CSS 타입을 직
 GitHub CI에서는 호스팅 러너에 제공되는 Maven CLI로 동일한 pom.xml 테스트를 실행하며, Windows 로컬 실행은 저장소의 Maven Wrapper를 유지합니다.
 
 PR #5 추가 검색 계약: GET /api/v1/rooms의 선택 query origin과 period(ALL/MORNING/AFTERNOON/EVENING)를 도입했습니다. 기존 destination 요청과 응답 타입은 유지합니다. 한국 시간 기준을 포함한 정확한 조건은 API_SPEC.md의 검색 누락 수정 절을 참고합니다.
+
+
+## 방장 관리 추가 계약
+
+방 상세/동승자 관리에서 PATCH /api/v1/rooms/{roomId}/capacity로 정원을 바꾸고 DELETE /api/v1/rooms/{roomId}로 모집방을 삭제할 수 있습니다. RoomStatus.CANCELLED를 추가했습니다. 삭제는 논리 삭제이며 활성 참여는 취소 처리합니다. 검색과 내 동승방에서 숨기고 상세/참여 조회는 404가 됩니다.
+
+B 채팅 화면의 인원 표시는 고정 4명 대신 서버의 capacity와 participantCount를 사용해야 합니다. 삭제된 방의 채팅·탑승 요청·가상 택시 진입은 CANCELLED 상태 또는 방 상세 404를 처리하여 닫아 주세요. 방 삭제 후 채팅/탑승 데이터의 외래 키는 보존되므로 B 테이블을 임의 삭제하지 않습니다. 가상 택시는 정원이 전부 찼는지가 아니라 실제 확정 인원과 탑승 수락을 기준으로 진행 여부를 판단해야 합니다.
+
+현재 구현은 A의 방 상세/동승자 관리 화면에 적용했습니다. B의 별도 채팅 UI/서버는 수정하지 않았습니다. 연결한 뒤 각자의 기존 기능 브랜치에서 변경 내용을 검토·통합하고 dev 병합은 별도 승인 후 진행합니다.

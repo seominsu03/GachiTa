@@ -38,7 +38,7 @@ function useMutation() {
   const lock = useRef(false); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
   async function run(action: () => Promise<void>) {
     if (lock.current) return; lock.current = true; setBusy(true); setError(null);
-    try { await action(); } catch (failure) { setError(failure instanceof Error ? failure.message : '요청에 실패했어요.'); }
+    try { await action(); } catch (failure) { setError(failure instanceof Error ? failure.message : '요청에 실패했어요.'); throw failure; }
     finally { lock.current = false; setBusy(false); }
   }
   return { busy, error, run };
@@ -46,7 +46,7 @@ function useMutation() {
 
 export function CreateRoomRoute() {
   const mutation = useMutation();
-  return <CreateRoomScreen busy={mutation.busy} error={mutation.error} onCreate={(input: RoomCreateRequest) => void mutation.run(async () => { const created = await rooms.createRoom(input); router.replace({ pathname: '/rooms/[roomId]/participants', params: { roomId: String(created.roomId) } }); })} />;
+  return <CreateRoomScreen busy={mutation.busy} error={mutation.error} onCreate={(input: RoomCreateRequest) => void mutation.run(async () => { const created = await rooms.createRoom(input); router.replace({ pathname: '/rooms/[roomId]/participants', params: { roomId: String(created.roomId) } }); }).catch(() => {})} />;
 }
 
 export function RoomRoute({ screen }: { screen: 'detail' | 'participants' | SettlementStage }) {
@@ -63,12 +63,17 @@ export function RoomRoute({ screen }: { screen: 'detail' | 'participants' | Sett
   const remote = useRemote(load);
   if (!remote.data) return <Screen title="택시방"><Text style={ui.body}>{remote.loading ? '불러오는 중…' : '택시방을 불러오지 못했어요.'}</Text>{remote.error && <Notice error>{remote.error}</Notice>}<Button secondary onPress={() => void remote.refresh()}>다시 불러오기</Button></Screen>;
   const { room, members, bill } = remote.data;
-  const mutate = (action: () => Promise<unknown>, next?: string) => void mutation.run(async () => { await action(); await remote.refresh(); if (next) navigateRoom(next, roomId); });
+  const mutate = (action: () => Promise<unknown>, next?: string) => void mutation.run(async () => { await action(); await remote.refresh(); if (next) navigateRoom(next, roomId); }).catch(() => {});
+  const updateCapacity = (capacity: number) => mutation.run(async () => { await rooms.updateRoomCapacity(roomId, capacity); await remote.refresh(); });
+  const deleteCurrentRoom = () => mutation.run(async () => {
+    await rooms.deleteRoom(roomId);
+    router.replace('/(tabs)/mypage');
+  });
   const error = mutation.error ?? remote.error;
-  if (screen === 'detail') return <RoomDetailScreen onRefresh={() => void remote.refresh()} room={room} participations={members} userId={user?.userId ?? 0} navigate={navigateRoom} busy={mutation.busy} error={error} onRequest={() => mutate(() => participation.requestParticipation(roomId))} onCancel={id => mutate(() => participation.cancelParticipation(roomId, id))} />;
+  if (screen === 'detail') return <RoomDetailScreen onUpdateCapacity={updateCapacity} onDeleteRoom={deleteCurrentRoom} onRefresh={() => void remote.refresh()} room={room} participations={members} userId={user?.userId ?? 0} navigate={navigateRoom} busy={mutation.busy} error={error} onRequest={() => mutate(() => participation.requestParticipation(roomId))} onCancel={id => mutate(() => participation.cancelParticipation(roomId, id))} />;
   if (screen === 'participants') {
     if (user?.userId !== room.hostUserId) return <Screen title="동승자 관리"><Notice error>방장만 동승자를 관리할 수 있어요.</Notice></Screen>;
-    return <ParticipantsScreen onRefresh={() => void remote.refresh()} room={room} participations={members} navigate={navigateRoom} busy={mutation.busy} error={error} onApprove={id => mutate(() => participation.approveParticipation(roomId, id))} onReject={id => mutate(() => participation.rejectParticipation(roomId, id))} />;
+    return <ParticipantsScreen onUpdateCapacity={updateCapacity} onDeleteRoom={deleteCurrentRoom} onRefresh={() => void remote.refresh()} room={room} participations={members} navigate={navigateRoom} busy={mutation.busy} error={error} onApprove={id => mutate(() => participation.approveParticipation(roomId, id))} onReject={id => mutate(() => participation.rejectParticipation(roomId, id))} />;
   }
   const requestedStage = screen === 'amount' && (bill || step === 'confirm') ? 'confirm' : screen === 'amount' && userId !== room.hostUserId ? 'settlement' : screen;
   // Already-created bills are immutable; a stale amount URL opens the saved result.

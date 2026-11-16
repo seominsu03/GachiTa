@@ -29,6 +29,7 @@ public class TaxiRoom {
     public LocationInfo getDestination() { return new LocationInfo(destinationName, destinationLatitude, destinationLongitude); }
     public Instant getDepartureAt() { return departureAt; } public int getCapacity() { return capacity; }
     public int getParticipantCount() { return participantCount; } public RoomStatus getStatus() { return status; }
+    public void setCapacity(int capacity) { this.capacity = capacity; }
     public void setParticipantCount(int count) { participantCount = count; }
     public void setStatus(RoomStatus status) { this.status = status; }
 }
