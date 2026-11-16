@@ -1,0 +1,25 @@
+{
+  "success": true,
+  "verifiedAt": "2026-11-16T07:51:04.930Z",
+  "userId": 1,
+  "roomIds": [
+    1,
+    2,
+    3
+  ],
+  "checks": [
+    "MySQL dev startup and JPA schema validation",
+    "signup",
+    "room creation",
+    "origin and KST period search",
+    "login and records after full JVM restart"
+  ],
+  "databaseProduct": "MySQL",
+  "databaseVersion": "8.4.13",
+  "springProfile": "dev",
+  "beforeRestartPid": 16848,
+  "afterRestartPid": 23816,
+  "testAccountCount": 1,
+  "testRoomCount": 3,
+  "note": "Only generated test record IDs are included. No database password or real account details are recorded."
+}
