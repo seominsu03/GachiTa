@@ -16,6 +16,7 @@ import type { RoomCreateRequest } from '@/types/room';
 export const navigateRoom: Navigate = (screen, roomId, search) => {
   if (screen === 'home') router.push('/(tabs)');
   else if (screen === 'rooms') router.push({ pathname: '/(tabs)/rooms', params: search });
+  else if (screen === 'chats') router.push('/(tabs)/chats');
   else if (screen === 'mypage') router.push('/(tabs)/mypage');
   else if (screen === 'create') router.push('/rooms/create');
   else if (screen === 'detail') router.push({ pathname: '/rooms/[roomId]', params: { roomId: String(roomId) } });

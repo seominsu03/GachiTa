@@ -11,7 +11,7 @@ import type { LocationInfo } from '@/types/contracts';
 export type Navigate = (screen: string, roomId?: number, search?: Record<string, string>) => void;
 export function BottomNavigation({ active, navigate }: { active: 'home' | 'rooms' | 'mypage'; navigate: Navigate }) {
   return <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: c.line, paddingTop: 8, paddingBottom: 20, backgroundColor: c.white }}>
-    {(['home', 'rooms', 'chats', 'mypage'] as const).map((name, index) => <Pressable key={name} accessibilityRole="button" accessibilityState={{ selected: name === active, disabled: name === 'chats' }} accessibilityLabel={['홈', '택시방', '채팅', '내 정보'][index]} onPress={() => name !== 'chats' && navigate(name)} style={{ flex: 1, alignItems: 'center', gap: 3, minHeight: 40 }}>
+    {(['home', 'rooms', 'chats', 'mypage'] as const).map((name, index) => <Pressable key={name} accessibilityRole="button" accessibilityState={{ selected: name === active }} accessibilityLabel={['홈', '택시방', '채팅', '내 정보'][index]} onPress={() => navigate(name)} style={{ flex: 1, alignItems: 'center', gap: 3, minHeight: 40 }}>
       <Icon name={(['home', 'car', 'chat', 'user'] as const)[index]} color={name === active ? c.blue : c.faint} /><Text style={{ fontSize: 11, color: name === active ? c.blue : c.muted }}>{['홈', '택시방', '채팅', '내 정보'][index]}</Text>
     </Pressable>)}
   </View>;
