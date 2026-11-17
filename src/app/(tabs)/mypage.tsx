@@ -28,7 +28,7 @@ export default function MyPageScreen() {
     {remote.loading && <Notice>동승방을 불러오고 있어요.</Notice>}
     {!remote.loading && !remote.error && !remote.data?.length && <Notice>아직 참여 중인 동승방이 없어요.</Notice>}
     {remote.data?.map(room => <Card key={room.roomId}>
-      <View style={ui.between}><Text style={ui.bold}>{room.origin.name} → {room.destination.name}</Text><Text style={ui.badge}>{roomStatusLabels[room.status]}</Text></View>
+      <View style={[ui.between, { alignItems: 'flex-start', gap: 8 }]}><Text style={[ui.bold, { flex: 1, minWidth: 0, flexShrink: 1 }]}>{room.origin.name} → {room.destination.name}</Text><Text style={[ui.badge, { flexShrink: 0 }]}>{roomStatusLabels[room.status]}</Text></View>
       <Text style={ui.muted}>{departureLabel(room.departureAt)} · {room.hostUserId === userId ? '내가 만든 방' : '신청한 방'}</Text>
       <Button secondary small onPress={() => navigateRoom('detail', room.roomId)}>방 상세 보기</Button>
     </Card>)}

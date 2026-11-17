@@ -16,7 +16,7 @@ public class RoomService {
     public RoomService(RoomRepository rooms, UserRepository users, ParticipationRepository members) { this.rooms = rooms; this.users = users; this.members = members; }
     public RoomResponse createRoom(Long userId, RoomCreateRequest input) {
         var user = users.findById(userId).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "다시 로그인해 주세요."));
-        if (input.origin().name().equals(input.destination().name()) || (input.origin().latitude() == input.destination().latitude() && input.origin().longitude() == input.destination().longitude()))
+        if (input.origin().latitude() == input.destination().latitude() && input.origin().longitude() == input.destination().longitude())
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "출발지와 목적지를 다르게 선택해 주세요.");
         return RoomResponse.from(rooms.save(new TaxiRoom(user, input)));
     }
@@ -25,7 +25,7 @@ public class RoomService {
     }
     @Transactional(readOnly = true) public List<RoomResponse> getRooms(String origin, String destination, String period) {
         var departurePeriod = DeparturePeriod.parse(period);
-        return rooms.search(RoomStatus.RECRUITING, origin.strip(), destination.strip(),
+        return rooms.search(RoomStatus.RECRUITING, Instant.now(), origin.strip(), destination.strip(),
                 departurePeriod.startHour(), departurePeriod.endHour(), PageRequest.of(0, 100))
                 .stream().map(RoomResponse::from).toList();
     }
@@ -49,6 +49,19 @@ public class RoomService {
         if (capacity < 2 || capacity > 4) throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "방장 포함 2~4명을 선택해 주세요.");
         if (capacity < room.getParticipantCount()) throw new ApiException(HttpStatus.CONFLICT, "CAPACITY_BELOW_PARTICIPANTS", "확정된 참여 인원보다 적게 설정할 수 없습니다.");
         room.setCapacity(capacity);
+        return RoomResponse.from(room);
+    }
+    public RoomResponse updateLocations(Long roomId, Long userId, RoomLocationsRequest input) {
+        var room = lockHostRoom(roomId, userId);
+        if (!room.getDepartureAt().isAfter(Instant.now()))
+            throw new ApiException(HttpStatus.CONFLICT, "ROOM_NOT_RECRUITING", "출발 시간이 지난 방은 장소를 변경할 수 없습니다.");
+        if (room.getParticipantCount() != 1 || members.findByRoomRoomIdOrderByParticipationId(roomId).stream()
+                .anyMatch(member -> member.getStatus() == ParticipationStatus.PENDING || member.getStatus() == ParticipationStatus.APPROVED || member.getStatus() == ParticipationStatus.BOARDING_CONFIRMED))
+            throw new ApiException(HttpStatus.CONFLICT, "ROOM_HAS_APPLICANTS", "참여자나 대기 신청자가 있으면 장소를 변경할 수 없습니다.");
+        if (input.origin().latitude() == input.destination().latitude() && input.origin().longitude() == input.destination().longitude())
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "출발지와 목적지를 다르게 선택해 주세요.");
+        room.setOrigin(input.origin());
+        room.setDestination(input.destination());
         return RoomResponse.from(room);
     }
     public void deleteRoom(Long roomId, Long userId) {

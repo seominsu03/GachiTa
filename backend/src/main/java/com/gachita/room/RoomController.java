@@ -23,6 +23,9 @@ public class RoomController {
     @PatchMapping("/{roomId}/capacity") public ApiResponse<RoomResponse> updateRoomCapacity(@PathVariable Long roomId, Principal principal, @Valid @RequestBody RoomCapacityRequest input) {
         return ApiResponse.ok(rooms.updateRoomCapacity(roomId, Long.valueOf(principal.getName()), input.capacity()), "모집 인원을 변경했어요.");
     }
+    @PatchMapping("/{roomId}/locations") public ApiResponse<RoomResponse> updateLocations(@PathVariable Long roomId, Principal principal, @Valid @RequestBody RoomLocationsRequest input) {
+        return ApiResponse.ok(rooms.updateLocations(roomId, Long.valueOf(principal.getName()), input), "장소를 변경했어요.");
+    }
     @DeleteMapping("/{roomId}") public ApiResponse<Void> deleteRoom(@PathVariable Long roomId, Principal principal) {
         rooms.deleteRoom(roomId, Long.valueOf(principal.getName()));
         return ApiResponse.ok(null, "택시방을 삭제했어요.");

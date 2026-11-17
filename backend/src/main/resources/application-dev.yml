@@ -4,6 +4,8 @@ server:
       cookie:
         secure: false
 spring:
+  config:
+    import: optional:file:./.env.local[.properties]
   sql:
     init:
       mode: always

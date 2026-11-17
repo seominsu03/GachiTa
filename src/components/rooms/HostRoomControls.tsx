@@ -3,8 +3,9 @@ import { Modal, Text, View } from 'react-native';
 import { Button, Card, Notice, ui } from '@/components/ui/DesignSystem';
 import type { Room } from '@/types/room';
 
-export function HostRoomControls({ room, busy, onUpdate, onDelete }: {
+export function HostRoomControls({ room, busy, onUpdate, onDelete, onEditLocations, canEditLocations }: {
   room: Room; busy?: boolean; onUpdate: (capacity: number) => Promise<void>; onDelete: () => Promise<void>;
+  onEditLocations?: () => void; canEditLocations?: boolean;
 }) {
   const [mode, setMode] = useState<'capacity' | 'delete' | null>(null);
   const [capacity, setCapacity] = useState(room.capacity);
@@ -18,6 +19,8 @@ export function HostRoomControls({ room, busy, onUpdate, onDelete }: {
     <Text style={ui.heading}>방 관리</Text>
     <Notice>총 정원은 방장 포함 2~4명입니다. 정원을 모두 채우지 않아도 실제 확정 인원으로 요금을 나눠요.</Notice>
     <Button secondary disabled={busy || room.status !== 'RECRUITING'} onPress={() => open('capacity')}>모집 인원 수정</Button>
+    {onEditLocations && <Button secondary disabled={busy || !canEditLocations} onPress={onEditLocations}>장소 변경</Button>}
+    {onEditLocations && !canEditLocations && <Notice>참여자나 대기 신청자가 없는 모집 중인 방에서만 장소를 변경할 수 있어요.</Notice>}
     <Button secondary disabled={busy || room.status !== 'RECRUITING'} onPress={() => open('delete')}>택시방 삭제</Button>
     {room.status !== 'RECRUITING' && <Notice>탑승 확인이 시작된 이후에는 정원 변경과 방 삭제가 제한됩니다.</Notice>}
     <Modal visible={mode !== null} transparent animationType="fade" onRequestClose={() => { if (!busy) setMode(null); }}>
