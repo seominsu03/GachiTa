@@ -2,7 +2,7 @@ import { type ComponentProps, type ForwardRefExoticComponent, type RefAttributes
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-import type { DestinationSelection, PlaceSearchRequest, PlaceSearchResponse, PlaceSearchResult } from '@/types/map';
+import type { PointSelection, PlaceSearchRequest, PlaceSearchResponse, PlaceSearchResult } from '@/types/map';
 
 const KAKAO_MAP_WEB_ORIGIN = 'http://localhost';
 
@@ -31,7 +31,7 @@ type KakaoMapViewProps = {
   onPointChange: (kind: MapPointKind, selection: MapSelection) => void;
   searchRequest: PlaceSearchRequest | null;
   onSearchResponse: (response: PlaceSearchResponse) => void;
-  destinationSelection: DestinationSelection | null;
+  pointSelection: PointSelection | null;
   overview: MapOverview | null;
 };
 
@@ -86,8 +86,8 @@ function createMapHtml(javascriptKey: string, initialDeparture?: MapCoordinates 
         var activePoint = 'departure';
         var inOverview = false;
         var routePolyline = null;
-        var selectedSearchPosition = null;
-        var destinationSelectionId = null;
+        var selectedSearchPositions = { departure: null, destination: null };
+        var pointSelectionIds = { departure: null, destination: null };
         var latestSearchRequestId = 0;
         var centerPin = document.getElementById('centerPin');
         var centerPinLabel = document.getElementById('centerPinLabel');
@@ -207,8 +207,8 @@ function createMapHtml(javascriptKey: string, initialDeparture?: MapCoordinates 
             buildingCandidate: buildingCandidate,
             roadAddress: roadAddress,
             addressKind: addressKind || null,
-            source: kind === 'destination' && samePosition(position, selectedSearchPosition) ? 'search' : 'map',
-            selectionId: kind === 'destination' ? destinationSelectionId : null
+            source: samePosition(position, selectedSearchPositions[kind]) ? 'search' : 'map',
+            selectionId: pointSelectionIds[kind]
           }));
         }
 
@@ -307,41 +307,44 @@ function createMapHtml(javascriptKey: string, initialDeparture?: MapCoordinates 
           }
         };
 
-        function beginDestination(position, selectionId, fromSearch) {
-          selectedSearchPosition = fromSearch ? position : null;
-          destinationSelectionId = selectionId;
-          lookupVersions.destination += 1;
-          lookupState.destination.position = null;
-          if (!markers.destination) {
+        function beginPoint(kind, position, selectionId, fromSearch) {
+          selectedSearchPositions[kind] = fromSearch ? position : null;
+          pointSelectionIds[kind] = selectionId;
+          lookupVersions[kind] += 1;
+          lookupState[kind].position = null;
+          if (kind === 'destination' && !markers.destination) {
             markers.destination = new kakao.maps.Marker({
               position: position,
               image: markerImages.destination,
               title: '도착지'
             });
           } else {
-            markers.destination.setPosition(position);
+            markers[kind].setPosition(position);
           }
-          window.setActivePoint('destination');
+          window.setActivePoint(kind);
           map.setCenter(position);
-          refreshPoint('destination', map.getCenter());
+          refreshPoint(kind, map.getCenter());
         }
 
-        window.selectDestination = function(latitude, longitude, selectionId) {
+        window.selectPoint = function(kind, latitude, longitude, selectionId) {
+          if (kind !== 'departure' && kind !== 'destination') return;
           if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
               !Number.isFinite(longitude) || longitude < -180 || longitude > 180 ||
               !Number.isInteger(selectionId) || selectionId < 1) return;
-          beginDestination(new kakao.maps.LatLng(latitude, longitude), selectionId, true);
+          beginPoint(kind, new kakao.maps.LatLng(latitude, longitude), selectionId, true);
         };
 
-        window.startDestinationOnMap = function(selectionId) {
+        window.startPointOnMap = function(kind, selectionId) {
+          if (kind !== 'departure' && kind !== 'destination') return;
           if (!Number.isInteger(selectionId) || selectionId < 1) return;
-          beginDestination(map.getCenter(), selectionId, false);
+          beginPoint(kind, map.getCenter(), selectionId, false);
         };
 
-        window.startDestinationAt = function(latitude, longitude, selectionId) {
+        window.startPointAt = function(kind, latitude, longitude, selectionId) {
+          if (kind !== 'departure' && kind !== 'destination') return;
           var position = toLatLng({ latitude: latitude, longitude: longitude });
           if (!position || !Number.isInteger(selectionId) || selectionId < 1) return;
-          beginDestination(position, selectionId, false);
+          beginPoint(kind, position, selectionId, false);
         };
 
         kakao.maps.event.addListener(map, 'dragstart', function() {
@@ -381,7 +384,7 @@ function createMapHtml(javascriptKey: string, initialDeparture?: MapCoordinates 
 </html>`;
 }
 
-export default function KakaoMapView({ activePoint, initialDeparture, onPointChange, searchRequest, onSearchResponse, destinationSelection, overview }: KakaoMapViewProps) {
+export default function KakaoMapView({ activePoint, initialDeparture, onPointChange, searchRequest, onSearchResponse, pointSelection, overview }: KakaoMapViewProps) {
   const webViewRef = useRef<WebViewHandle>(null);
   const javascriptKey = process.env.EXPO_PUBLIC_KAKAO_MAP_JS_KEY?.trim();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -412,24 +415,24 @@ export default function KakaoMapView({ activePoint, initialDeparture, onPointCha
   }, [searchRequest, status]);
 
   useEffect(() => {
-    if (status === 'ready' && destinationSelection) {
-      if (destinationSelection.place) {
-        const { latitude, longitude } = destinationSelection.place;
+    if (status === 'ready' && pointSelection) {
+      if (pointSelection.place) {
+        const { latitude, longitude } = pointSelection.place;
         webViewRef.current?.injectJavaScript(
-          `window.selectDestination(${latitude}, ${longitude}, ${destinationSelection.selectionId}); true;`,
+          `window.selectPoint(${JSON.stringify(pointSelection.kind)}, ${latitude}, ${longitude}, ${pointSelection.selectionId}); true;`,
         );
-      } else if (destinationSelection.coordinates) {
-        const { latitude, longitude } = destinationSelection.coordinates;
+      } else if (pointSelection.coordinates) {
+        const { latitude, longitude } = pointSelection.coordinates;
         webViewRef.current?.injectJavaScript(
-          `window.startDestinationAt(${latitude}, ${longitude}, ${destinationSelection.selectionId}); true;`,
+          `window.startPointAt(${JSON.stringify(pointSelection.kind)}, ${latitude}, ${longitude}, ${pointSelection.selectionId}); true;`,
         );
       } else {
         webViewRef.current?.injectJavaScript(
-          `window.startDestinationOnMap(${destinationSelection.selectionId}); true;`,
+          `window.startPointOnMap(${JSON.stringify(pointSelection.kind)}, ${pointSelection.selectionId}); true;`,
         );
       }
     }
-  }, [destinationSelection, status]);
+  }, [pointSelection, status]);
 
   if (!javascriptKey) {
     return (

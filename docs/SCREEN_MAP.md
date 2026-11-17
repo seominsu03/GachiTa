@@ -9,7 +9,7 @@
 | 메인 S-03 | src/app/(tabs)/index.tsx | 서버 방 목록 |
 | 목록 S-04 | src/app/(tabs)/rooms.tsx | 목적지 검색·필터 |
 | 생성 S-05 | src/app/rooms/create.tsx | 지도 선택 화면에서 출발지·도착지 좌표를 확정해 방 생성 |
-| 지도 위치 선택 | src/app/map/picker.tsx | 장소 검색 또는 지도 이동으로 위치 선택·미세 조정; 도로 경로·거리·예상 시간 표시 |
+| 지도 위치 선택 | src/app/map/picker.tsx | 출발지·도착지 각각 검색 또는 지도 이동으로 선택·미세 조정; 두 좌표의 도로 경로·거리·예상 시간 표시 |
 | 채팅 목록 | src/app/(tabs)/chats.tsx | 참여 중인 방을 서버에서 조회 |
 | 택시방 채팅·탑승 확인 | src/app/rooms/[roomId]/chat.tsx | 기기 내 메시지 UI와 서버 탑승 확인 요청·응답 |
 | 상세 S-06~07 | src/app/rooms/[roomId]/index.tsx | 신청·취소·정산 진입 |

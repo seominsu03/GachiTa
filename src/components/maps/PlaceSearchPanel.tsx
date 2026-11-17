@@ -5,7 +5,8 @@ import type { PlaceSearchResult } from '@/types/map';
 export type SearchStatus = 'idle' | 'loading' | 'ok' | 'empty' | 'error';
 
 type PlaceSearchPanelProps = {
-  departureLabel: string;
+  kind: 'departure' | 'destination';
+  otherPointLabel: string;
   query: string;
   onQueryChange: (query: string) => void;
   status: SearchStatus;
@@ -16,7 +17,8 @@ type PlaceSearchPanelProps = {
 };
 
 export default function PlaceSearchPanel({
-  departureLabel,
+  kind,
+  otherPointLabel,
   query,
   onQueryChange,
   status,
@@ -25,17 +27,19 @@ export default function PlaceSearchPanel({
   onMapSelect,
   onBack,
 }: PlaceSearchPanelProps) {
+  const targetLabel = kind === 'departure' ? '출발지' : '도착지';
+  const otherLabel = kind === 'departure' ? '도착지 유지' : '출발지 유지';
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
         <Pressable accessibilityRole="button" accessibilityLabel="지도 선택으로 돌아가기" onPress={onBack} style={styles.backButton}>
           <Text style={styles.backText}>‹</Text>
         </Pressable>
-        <Text style={styles.title}>도착지 검색</Text>
+        <Text style={styles.title}>{targetLabel} 검색</Text>
       </View>
       <View style={styles.departureRow}>
-        <Text style={styles.departureLabel}>출발지 유지</Text>
-        <Text style={styles.departureName} numberOfLines={1}>{departureLabel}</Text>
+        <Text style={styles.departureLabel}>{otherLabel}</Text>
+        <Text style={styles.departureName} numberOfLines={1}>{otherPointLabel}</Text>
       </View>
       <Pressable accessibilityRole="button" onPress={onMapSelect} style={styles.mapChoice}>
         <Text style={styles.mapChoiceText}>검색 없이 지도에서 직접 선택</Text>
@@ -43,7 +47,7 @@ export default function PlaceSearchPanel({
       </Pressable>
       <TextInput
         autoFocus
-        accessibilityLabel="도착지 장소 검색"
+        accessibilityLabel={`${targetLabel} 장소 검색`}
         autoCapitalize="none"
         placeholder="장소나 건물명을 입력해 주세요"
         placeholderTextColor="#8A96A8"
@@ -53,7 +57,7 @@ export default function PlaceSearchPanel({
         style={styles.input}
       />
       <ScrollView style={styles.resultsList} contentContainerStyle={styles.results} keyboardShouldPersistTaps="handled">
-        {status === 'idle' && <Text style={styles.message}>도착지 이름을 검색해 주세요.</Text>}
+        {status === 'idle' && <Text style={styles.message}>{targetLabel} 이름을 검색해 주세요.</Text>}
         {status === 'loading' && <Text style={styles.message}>장소를 찾는 중...</Text>}
         {status === 'empty' && <Text style={styles.message}>검색 결과가 없어요. 다른 이름으로 검색해 보세요.</Text>}
         {status === 'error' && <Text style={styles.message}>장소 검색에 실패했어요. 다시 입력해 주세요.</Text>}

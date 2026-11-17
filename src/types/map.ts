@@ -16,7 +16,8 @@ export type PlaceSearchResponse = PlaceSearchRequest & {
   places: PlaceSearchResult[];
 };
 
-export type DestinationSelection = {
+export type PointSelection = {
+  kind: 'departure' | 'destination';
   selectionId: number;
   place: PlaceSearchResult | null;
   coordinates?: { latitude: number; longitude: number };

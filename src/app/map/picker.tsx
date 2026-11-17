@@ -8,7 +8,7 @@ import PlaceSearchPanel, { type SearchStatus } from '@/components/maps/PlaceSear
 import { getDrivingRoute, type DrivingRoute } from '@/features/maps/drivingRoute';
 import { useRoomCreateDraft, type RoomDraftPoint } from '@/features/maps/RoomCreateDraftContext';
 import { updateRoomLocations } from '@/features/rooms/api';
-import type { DestinationSelection, PlaceSearchRequest, PlaceSearchResponse, PlaceSearchResult } from '@/types/map';
+import type { PointSelection, PlaceSearchRequest, PlaceSearchResponse, PlaceSearchResult } from '@/types/map';
 import { ApiError } from '@/services/apiClient';
 
 type RouteState = { status: 'idle' | 'loading' } | { status: 'ready'; route: DrivingRoute } | { status: 'error'; message: string };
@@ -28,8 +28,8 @@ const pointOptions: { kind: MapPointKind; label: string }[] = [
   { kind: 'destination', label: '도착지' },
 ];
 
-function getPointSummary(kind: MapPointKind, point: MapSelection | undefined, searchedPlace: PlaceSearchResult | null): string {
-  if (kind === 'destination' && searchedPlace && (!point || point.source === 'search')) {
+function getPointSummary(point: MapSelection | undefined, searchedPlace: PlaceSearchResult | null): string {
+  if (searchedPlace && (!point || point.source === 'search')) {
     return searchedPlace.name;
   }
   if (!point) return '아직 선택하지 않음';
@@ -94,7 +94,8 @@ export default function MapPickerScreen() {
   const [searchRequest, setSearchRequest] = useState<PlaceSearchRequest | null>(null);
   const [searchStatus, setSearchStatus] = useState<SearchStatus>('idle');
   const [searchResults, setSearchResults] = useState<PlaceSearchResult[]>([]);
-  const [destinationSelection, setDestinationSelection] = useState<DestinationSelection | null>(null);
+  const [pointSelection, setPointSelection] = useState<PointSelection | null>(null);
+  const [pointSelections, setPointSelections] = useState<Partial<Record<MapPointKind, PointSelection>>>({});
   const [destinationConfirmed, setDestinationConfirmed] = useState(Boolean(initialOverview));
   const [overview, setOverview] = useState<MapOverview | null>(initialOverview);
   const [routeState, setRouteState] = useState<RouteState>(initialOverview ? { status: 'loading' } : { status: 'idle' });
@@ -102,21 +103,25 @@ export default function MapPickerScreen() {
   const searchRequestCounter = useRef(0);
   const currentSearchRequestId = useRef(0);
   const selectionCounter = useRef(0);
-  const currentSelectionId = useRef<number | null>(null);
   const confirmedPosition = useRef<{ latitude: number; longitude: number } | null>(initialOverview?.destination ?? null);
   const selectedPoint = points[activePoint];
-  const savedPlace = initialDestination?.source === 'search' && initialDestination.placeId && points.destination &&
-    Math.abs(points.destination.latitude - initialDestination.latitude) < 0.0000001 &&
-    Math.abs(points.destination.longitude - initialDestination.longitude) < 0.0000001
-    ? { id: initialDestination.placeId, name: initialDestination.name,
-      latitude: initialDestination.latitude, longitude: initialDestination.longitude,
-      roadAddress: initialDestination.roadAddress } : null;
-  const searchedPlace = destinationSelection ? destinationSelection.place : savedPlace;
-  const exactSearchPlace = activePoint === 'destination' && searchedPlace &&
+  function getSearchedPlace(kind: MapPointKind): PlaceSearchResult | null {
+    const selection = pointSelections[kind];
+    if (selection) return selection.place;
+    const saved = kind === 'departure' ? initialOrigin : initialDestination;
+    const point = points[kind];
+    return saved?.source === 'search' && saved.placeId && point &&
+      Math.abs(point.latitude - saved.latitude) < 0.0000001 &&
+      Math.abs(point.longitude - saved.longitude) < 0.0000001
+      ? { id: saved.placeId, name: saved.name, latitude: saved.latitude,
+        longitude: saved.longitude, roadAddress: saved.roadAddress } : null;
+  }
+  const searchedPlace = getSearchedPlace(activePoint);
+  const exactSearchPlace = searchedPlace &&
     (!selectedPoint || selectedPoint.source === 'search') ? searchedPlace : null;
-  const canConfirmDestination = Boolean(points.departure && (points.destination || searchedPlace));
-  const departureDraft = toDraftPoint(points.departure, null);
-  const destinationDraft = toDraftPoint(points.destination, searchedPlace);
+  const canConfirmDestination = Boolean(points.departure && (points.destination || getSearchedPlace('destination')));
+  const departureDraft = toDraftPoint(points.departure, getSearchedPlace('departure'));
+  const destinationDraft = toDraftPoint(points.destination, getSearchedPlace('destination'));
   const canApply = Boolean(overview && destinationConfirmed && departureDraft && destinationDraft);
   const displayedOverview = overview && routeState.status === 'ready'
     ? { ...overview, routePath: routeState.route.path } : overview;
@@ -157,10 +162,11 @@ export default function MapPickerScreen() {
     return () => clearTimeout(timer);
   }, [searchOpen, searchText]);
 
-  function openDestinationSearch() {
+  function openSearch(kind: MapPointKind) {
     confirmedPosition.current = null;
     setDestinationConfirmed(false);
     clearRoute();
+    setActivePoint(kind);
     setSearchText('');
     setSearchRequest(null);
     setSearchStatus('idle');
@@ -168,27 +174,29 @@ export default function MapPickerScreen() {
     setSearchOpen(true);
   }
 
-  function beginDestinationSelection(place: PlaceSearchResult | null, coordinates?: { latitude: number; longitude: number }) {
+  function beginPointSelection(kind: MapPointKind, place: PlaceSearchResult | null, coordinates?: { latitude: number; longitude: number }) {
     Keyboard.dismiss();
     const selectionId = ++selectionCounter.current;
-    currentSelectionId.current = selectionId;
     confirmedPosition.current = null;
-    setDestinationSelection({ selectionId, place, coordinates });
+    const selection: PointSelection = { kind, selectionId, place, coordinates };
+    setPointSelection(selection);
+    setPointSelections(previous => ({ ...previous, [kind]: selection }));
     setDestinationConfirmed(false);
     clearRoute();
-    setPoints((previous) => ({ ...previous, destination: undefined }));
-    setActivePoint('destination');
+    setPoints((previous) => ({ ...previous, [kind]: undefined }));
+    setActivePoint(kind);
     setSearchOpen(false);
-  }
-
-  function selectDestination(place: PlaceSearchResult) {
-    beginDestinationSelection(place);
   }
 
   function handlePointChange(kind: MapPointKind, selection: MapSelection) {
     if (overview) return;
+    if (pointSelections[kind] && selection.selectionId !== pointSelections[kind].selectionId) return;
+    const saved = kind === 'departure' ? initialOrigin : initialDestination;
+    if (!pointSelections[kind] && saved?.source === 'search' && points[kind]?.source === 'search' &&
+      selection.source === 'map' &&
+      Math.abs(selection.latitude - saved.latitude) < 0.0000001 &&
+      Math.abs(selection.longitude - saved.longitude) < 0.0000001) return;
     if (kind === 'destination') {
-      if (selection.selectionId !== currentSelectionId.current) return;
       const confirmed = confirmedPosition.current;
       if (confirmed && (
         Math.abs(confirmed.latitude - selection.latitude) >= 0.0000001 ||
@@ -216,7 +224,7 @@ export default function MapPickerScreen() {
       return;
     }
     const departure = points.departure;
-    const destination = points.destination ?? searchedPlace;
+    const destination = points.destination ?? getSearchedPlace('destination');
     if (!departure || !destination) return;
     confirmedPosition.current = { latitude: destination.latitude, longitude: destination.longitude };
     routeRequestId.current++;
@@ -263,7 +271,7 @@ export default function MapPickerScreen() {
           {overview
             ? '선택한 출발지와 도착지를 지도에서 함께 확인하세요.'
             : activePoint === 'departure'
-              ? '지도를 움직여 중앙 핀 아래 출발지를 고르세요.'
+              ? '출발지를 검색하거나 지도를 움직여 중앙 핀 아래 위치를 고르세요.'
               : '지도를 움직여 중앙 핀 아래 도착지를 조정하세요.'}
         </Text>
       </View>
@@ -274,7 +282,7 @@ export default function MapPickerScreen() {
           onPointChange={handlePointChange}
           searchRequest={searchRequest}
           onSearchResponse={handleSearchResponse}
-          destinationSelection={destinationSelection}
+          pointSelection={pointSelection}
           overview={displayedOverview}
         />
       </View>
@@ -283,7 +291,7 @@ export default function MapPickerScreen() {
         <View style={styles.selectionRow}>
           {pointOptions.map(({ kind, label }) => {
             const selected = !overview && activePoint === kind;
-            const summary = getPointSummary(kind, points[kind], kind === 'destination' ? searchedPlace : null);
+            const summary = getPointSummary(points[kind], getSearchedPlace(kind));
             return (
               <Pressable
                 key={kind}
@@ -297,11 +305,11 @@ export default function MapPickerScreen() {
                     clearRoute();
                   }
                   if (kind === 'departure') setActivePoint('departure');
-                  else if (destinationSelection) setActivePoint('destination');
-                  else if (points.destination) beginDestinationSelection(savedPlace, {
+                  else if (pointSelections.destination) setActivePoint('destination');
+                  else if (points.destination) beginPointSelection('destination', getSearchedPlace('destination'), {
                     latitude: points.destination.latitude, longitude: points.destination.longitude,
                   });
-                  else openDestinationSearch();
+                  else openSearch('destination');
                 }}
                 style={[styles.selectionCard, selected && styles.selectionCardActive]}
               >
@@ -313,9 +321,7 @@ export default function MapPickerScreen() {
         </View>
         <View style={styles.locationPanel}>
           <Text style={styles.locationHeading}>
-            {activePoint === 'departure'
-              ? '출발 핀 위치'
-              : exactSearchPlace ? '검색 결과에서 선택한 장소' : overview ? '확정한 도착지' : '지도에서 조정한 위치'}
+            {exactSearchPlace ? '검색 결과에서 선택한 장소' : overview ? activePoint === 'departure' ? '확정한 출발지' : '확정한 도착지' : '지도에서 조정한 위치'}
           </Text>
           {exactSearchPlace ? (
             <>
@@ -377,7 +383,11 @@ export default function MapPickerScreen() {
         </View>
         {!overview && <Text style={styles.footerText} numberOfLines={2}>
           {activePoint === 'departure'
-              ? '지도 이동이 멈추면 중앙 핀 위치를 다시 조회합니다.'
+              ? selectedPoint?.source === 'map' && searchedPlace
+                ? `검색한 장소: ${searchedPlace.name} (참고)`
+                : searchedPlace
+                  ? '지도를 움직이면 핀 위치 정보로 전환됩니다.'
+                  : '지도 이동이 멈추면 중앙 핀 위치를 조회합니다.'
               : destinationConfirmed
                 ? '도착지를 선택했어요. 두 위치를 지도에서 확인할 수 있습니다.'
                 : selectedPoint?.source === 'map' && searchedPlace
@@ -386,9 +396,21 @@ export default function MapPickerScreen() {
                     ? '지도를 움직이면 핀 위치 정보로 전환됩니다.'
                     : '지도 이동이 멈추면 중앙 핀 위치를 조회합니다.'}
         </Text>}
-        {activePoint === 'destination' && (destinationSelection || points.destination) && !overview && (
+        {activePoint === 'departure' && !overview && (
           <View style={styles.actionRow}>
-            <Pressable accessibilityRole="button" onPress={openDestinationSearch} style={styles.secondaryButton}>
+            <Pressable accessibilityRole="button" onPress={() => openSearch('departure')} style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>출발지 검색</Text>
+            </Pressable>
+            {!points.destination && <Pressable accessibilityRole="button" accessibilityState={{ disabled: !departureDraft }}
+              disabled={!departureDraft} onPress={() => openSearch('destination')}
+              style={[styles.primaryButton, !departureDraft && styles.primaryButtonDisabled]}>
+              <Text style={styles.primaryButtonText}>도착지 선택</Text>
+            </Pressable>}
+          </View>
+        )}
+        {activePoint === 'destination' && (pointSelections.destination || points.destination) && !overview && (
+          <View style={styles.actionRow}>
+            <Pressable accessibilityRole="button" onPress={() => openSearch('destination')} style={styles.secondaryButton}>
               <Text style={styles.secondaryButtonText}>다시 검색</Text>
             </Pressable>
             <Pressable
@@ -423,7 +445,8 @@ export default function MapPickerScreen() {
       </View>
       {searchOpen && (
         <PlaceSearchPanel
-          departureLabel={points.departure?.buildingCandidate ?? points.departure?.roadAddress ?? '출발지 주소 확인 중'}
+          kind={activePoint}
+          otherPointLabel={getPointSummary(points[activePoint === 'departure' ? 'destination' : 'departure'], getSearchedPlace(activePoint === 'departure' ? 'destination' : 'departure'))}
           query={searchText}
           onQueryChange={(query) => {
             setSearchText(query);
@@ -432,8 +455,8 @@ export default function MapPickerScreen() {
           }}
           status={searchStatus}
           places={searchResults}
-          onSelect={selectDestination}
-          onMapSelect={() => beginDestinationSelection(null)}
+          onSelect={place => beginPointSelection(activePoint, place)}
+          onMapSelect={() => beginPointSelection(activePoint, null)}
           onBack={() => {
             Keyboard.dismiss();
             setSearchOpen(false);
