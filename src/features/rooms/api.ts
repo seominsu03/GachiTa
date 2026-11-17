@@ -1,6 +1,7 @@
 import { apiRequest } from '@/services/apiClient';
 import type { Room, RoomCreateRequest, RoomSearchParams } from '@/types/room';
 import { roomSearchQuery } from '@/features/rooms/search';
+import type { LocationInfo } from '@/types/contracts';
 
 // Retain getRooms('destination') compatibility for existing callers.
 export function getRooms(input: string | RoomSearchParams = '') {
@@ -12,4 +13,5 @@ export function getRoomById(roomId: number) { return apiRequest<Room>(`/api/v1/r
 export function createRoom(input: RoomCreateRequest) { return apiRequest<Room>('/api/v1/rooms', { method: 'POST', body: input }); }
 
 export function updateRoomCapacity(roomId: number, capacity: number) { return apiRequest<Room>(`/api/v1/rooms/${roomId}/capacity`, { method: 'PATCH', body: { capacity } }); }
+export function updateRoomLocations(roomId: number, origin: LocationInfo, destination: LocationInfo) { return apiRequest<Room>(`/api/v1/rooms/${roomId}/locations`, { method: 'PATCH', body: { origin, destination } }); }
 export function deleteRoom(roomId: number) { return apiRequest<null>(`/api/v1/rooms/${roomId}`, { method: 'DELETE' }); }

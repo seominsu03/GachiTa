@@ -12,6 +12,7 @@ import * as participation from '@/features/participation/api';
 import * as settlement from '@/features/settlement/api';
 import { ApiError } from '@/services/apiClient';
 import type { RoomCreateRequest } from '@/types/room';
+import { useRoomCreateDraft } from '@/features/maps/RoomCreateDraftContext';
 
 export const navigateRoom: Navigate = (screen, roomId, search) => {
   if (screen === 'home') router.push('/(tabs)');
@@ -48,7 +49,10 @@ function useMutation() {
 
 export function CreateRoomRoute() {
   const mutation = useMutation();
-  return <CreateRoomScreen busy={mutation.busy} error={mutation.error} onCreate={(input: RoomCreateRequest) => void mutation.run(async () => { const created = await rooms.createRoom(input); router.replace({ pathname: '/rooms/[roomId]/participants', params: { roomId: String(created.roomId) } }); }).catch(() => {})} />;
+  const { resetDraft } = useRoomCreateDraft();
+  return <CreateRoomScreen busy={mutation.busy} error={mutation.error}
+    onOpenMap={focus => router.push({ pathname: '/map/picker', params: { focus } })}
+    onCreate={(input: RoomCreateRequest) => void mutation.run(async () => { const created = await rooms.createRoom(input); resetDraft(); router.replace({ pathname: '/rooms/[roomId]/participants', params: { roomId: String(created.roomId) } }); }).catch(() => {})} />;
 }
 
 export function RoomRoute({ screen }: { screen: 'detail' | 'participants' | SettlementStage }) {
@@ -70,19 +74,27 @@ export function RoomRoute({ screen }: { screen: 'detail' | 'participants' | Sett
     const timer = setInterval(() => void refresh(), 3000);
     return () => clearInterval(timer);
   }, [awaitingApproval, refresh]));
+  const { startRoomEdit } = useRoomCreateDraft();
   if (!remote.data) return <Screen title="택시방"><Text style={ui.body}>{remote.loading ? '불러오는 중…' : '택시방을 불러오지 못했어요.'}</Text>{remote.error && <Notice error>{remote.error}</Notice>}<Button secondary onPress={() => void remote.refresh()}>다시 불러오기</Button></Screen>;
   const { room, members, bill } = remote.data;
   const mutate = (action: () => Promise<unknown>, next?: string) => void mutation.run(async () => { await action(); await remote.refresh(); if (next) navigateRoom(next, roomId); }).catch(() => {});
   const updateCapacity = (capacity: number) => mutation.run(async () => { await rooms.updateRoomCapacity(roomId, capacity); await remote.refresh(); });
+  const editLocations = () => {
+    if (!remote.data) return;
+    const toPoint = (location: typeof room.origin) => ({ ...location, source: 'map' as const,
+      roadAddress: location.name, buildingCandidate: null, placeId: null });
+    startRoomEdit({ roomId, origin: toPoint(room.origin), destination: toPoint(room.destination) });
+    router.push({ pathname: '/map/picker', params: { mode: 'edit-locations' } });
+  };
   const deleteCurrentRoom = () => mutation.run(async () => {
     await rooms.deleteRoom(roomId);
     router.replace('/(tabs)/mypage');
   });
   const error = mutation.error ?? remote.error;
-  if (screen === 'detail') return <RoomDetailScreen onUpdateCapacity={updateCapacity} onDeleteRoom={deleteCurrentRoom} onRefresh={() => void remote.refresh()} room={room} participations={members} userId={user?.userId ?? 0} navigate={navigateRoom} busy={mutation.busy} error={error} onRequest={() => mutate(() => participation.requestParticipation(roomId))} onCancel={id => mutate(() => participation.cancelParticipation(roomId, id))} />;
+  if (screen === 'detail') return <RoomDetailScreen onUpdateCapacity={updateCapacity} onDeleteRoom={deleteCurrentRoom} onEditLocations={editLocations} onRefresh={() => void remote.refresh()} room={room} participations={members} userId={user?.userId ?? 0} navigate={navigateRoom} busy={mutation.busy} error={error} onRequest={() => mutate(() => participation.requestParticipation(roomId))} onCancel={id => mutate(() => participation.cancelParticipation(roomId, id))} />;
   if (screen === 'participants') {
     if (user?.userId !== room.hostUserId) return <Screen title="동승자 관리"><Notice error>방장만 동승자를 관리할 수 있어요.</Notice></Screen>;
-    return <ParticipantsScreen onUpdateCapacity={updateCapacity} onDeleteRoom={deleteCurrentRoom} onRefresh={() => void remote.refresh()} room={room} participations={members} navigate={navigateRoom} busy={mutation.busy} error={error} onApprove={id => mutate(() => participation.approveParticipation(roomId, id))} onReject={id => mutate(() => participation.rejectParticipation(roomId, id))} />;
+    return <ParticipantsScreen onUpdateCapacity={updateCapacity} onDeleteRoom={deleteCurrentRoom} onEditLocations={editLocations} onRefresh={() => void remote.refresh()} room={room} participations={members} navigate={navigateRoom} busy={mutation.busy} error={error} onApprove={id => mutate(() => participation.approveParticipation(roomId, id))} onReject={id => mutate(() => participation.rejectParticipation(roomId, id))} />;
   }
   const requestedStage = screen === 'amount' && (bill || step === 'confirm') ? 'confirm' : screen === 'amount' && userId !== room.hostUserId ? 'settlement' : screen;
   // Already-created bills are immutable; a stale amount URL opens the saved result.

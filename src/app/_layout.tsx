@@ -6,6 +6,7 @@ import { ActivityIndicator, useColorScheme, View } from 'react-native';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ChatDemoProvider } from '@/features/chat/ChatDemoContext';
+import { RoomCreateDraftProvider } from '@/features/maps/RoomCreateDraftContext';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -33,6 +34,7 @@ function AuthNavigator() {
       <Stack.Protected guard={Boolean(user)}>
         <Stack.Screen name="index" />
         <Stack.Screen name="explore" />
+        <Stack.Screen name="map/picker" />
         <Stack.Screen name="(tabs)" />
       </Stack.Protected>
       <Stack.Screen name="preview" />
@@ -47,8 +49,10 @@ export default function TabLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AuthProvider>
-        <AnimatedSplashOverlay />
-        <AuthNavigator />
+        <RoomCreateDraftProvider>
+          <AnimatedSplashOverlay />
+          <AuthNavigator />
+        </RoomCreateDraftProvider>
       </AuthProvider>
     </ThemeProvider>
   );
