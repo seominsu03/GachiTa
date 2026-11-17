@@ -18,7 +18,8 @@ export function HostRoomControls({ room, busy, onUpdate, onDelete, onEditLocatio
   return <Card>
     <Text style={ui.heading}>방 관리</Text>
     <Notice>총 정원은 방장 포함 2~4명입니다. 정원을 모두 채우지 않아도 실제 확정 인원으로 요금을 나눠요.</Notice>
-    <Button secondary disabled={busy || room.status !== 'RECRUITING'} onPress={() => open('capacity')}>모집 인원 수정</Button>
+    <Button secondary disabled={busy || room.status !== 'RECRUITING' || room.participantCount >= room.capacity} onPress={() => open('capacity')}>모집 인원 수정</Button>
+    {room.status === 'RECRUITING' && room.participantCount >= room.capacity && <Notice>모집 인원이 모두 차서 정원을 다시 변경할 수 없어요.</Notice>}
     {onEditLocations && <Button secondary disabled={busy || !canEditLocations} onPress={onEditLocations}>장소 변경</Button>}
     {onEditLocations && !canEditLocations && <Notice>참여자나 대기 신청자가 없는 모집 중인 방에서만 장소를 변경할 수 있어요.</Notice>}
     <Button secondary disabled={busy || room.status !== 'RECRUITING'} onPress={() => open('delete')}>택시방 삭제</Button>
@@ -31,7 +32,7 @@ export function HostRoomControls({ room, busy, onUpdate, onDelete, onEditLocatio
           <View style={ui.row}>{[2, 3, 4].map(count => <View key={count} style={{ flex: 1 }}><Button secondary={capacity !== count} disabled={busy || count < room.participantCount} onPress={() => setCapacity(count)}>{count}명</Button></View>)}</View>
         </> : <Notice>방 목록과 내 동승방에서 사라지고, 참여 신청도 취소됩니다. 삭제 후 되돌릴 수 없습니다.</Notice>}
         {error && <Notice error>{error}</Notice>}
-        <Button busy={busy} onPress={() => void save()}>{mode === 'capacity' ? '인원 변경 저장' : '삭제 확인'}</Button>
+        <Button busy={busy} disabled={mode === 'capacity' && room.participantCount >= room.capacity} onPress={() => void save()}>{mode === 'capacity' ? '인원 변경 저장' : '삭제 확인'}</Button>
         <Button secondary disabled={busy} onPress={() => setMode(null)}>취소</Button>
       </Card></View>
     </Modal>

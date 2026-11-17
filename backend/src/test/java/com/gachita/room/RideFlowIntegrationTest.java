@@ -272,17 +272,29 @@ class RideFlowIntegrationTest {
         String path = "/api/v1/rooms/" + room.roomId() + "/capacity";
         mvc.perform(patch(path).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"capacity\":2}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.capacity").value(2));
+        mvc.perform(patch(path).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"capacity\":4}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.capacity").value(4));
         var firstRequest = participation.requestParticipation(room.roomId(), first.getUserId());
         participation.change(room.roomId(), firstRequest.participationId(), host.getUserId(), ParticipationStatus.APPROVED);
-        mvc.perform(patch(path).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"capacity\":3}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.capacity").value(3));
         var secondRequest = participation.requestParticipation(room.roomId(), second.getUserId());
         participation.change(room.roomId(), secondRequest.participationId(), host.getUserId(), ParticipationStatus.APPROVED);
         mvc.perform(patch(path).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"capacity\":2}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("CAPACITY_BELOW_PARTICIPANTS"));
         for (var capacity : List.of(1, 5, 2.5)) mvc.perform(patch(path).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(java.util.Map.of("capacity",capacity))))
                 .andExpect(status().isBadRequest());
-        assertThat(roomService.getRoomById(room.roomId()).capacity()).isEqualTo(3);
+        assertThat(roomService.getRoomById(room.roomId()).capacity()).isEqualTo(4);
+    }
+
+    @Test void fullRoomCannotChangeCapacityEvenToIncreaseIt() throws Exception {
+        var room = create(4);
+        String path = "/api/v1/rooms/" + room.roomId() + "/capacity";
+        mvc.perform(patch(path).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"capacity\":2}"))
+                .andExpect(status().isOk());
+        var request = participation.requestParticipation(room.roomId(), first.getUserId());
+        participation.change(room.roomId(), request.participationId(), host.getUserId(), ParticipationStatus.APPROVED);
+        mvc.perform(patch(path).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"capacity\":3}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("ROOM_FULL"));
+        assertThat(roomService.getRoomById(room.roomId()).capacity()).isEqualTo(2);
     }
 
     @Test void onlyHostCanChangeCapacityOrDeleteRoom() throws Exception {
@@ -340,7 +352,7 @@ class RideFlowIntegrationTest {
         var b = participation.requestParticipation(room.roomId(), second.getUserId());
         var start = new CountDownLatch(1); var executor = Executors.newFixedThreadPool(2);
         try {
-            var shrink = executor.submit(() -> { start.await(); try { roomService.updateRoomCapacity(room.roomId(),host.getUserId(),2); return true; } catch (ApiException e) { assertThat(e.getCode()).isEqualTo("CAPACITY_BELOW_PARTICIPANTS"); return false; } });
+            var shrink = executor.submit(() -> { start.await(); try { roomService.updateRoomCapacity(room.roomId(),host.getUserId(),2); return true; } catch (ApiException e) { assertThat(e.getCode()).isIn("CAPACITY_BELOW_PARTICIPANTS", "ROOM_FULL"); return false; } });
             var approve = executor.submit(() -> { start.await(); try { participation.change(room.roomId(),b.participationId(),host.getUserId(),ParticipationStatus.APPROVED); return true; } catch (ApiException e) { assertThat(e.getCode()).isEqualTo("ROOM_FULL"); return false; } });
             start.countDown();
             assertThat((shrink.get(10,TimeUnit.SECONDS) ? 1 : 0) + (approve.get(10,TimeUnit.SECONDS) ? 1 : 0)).isEqualTo(1);

@@ -26,19 +26,25 @@ export function BottomNavigation({ active, navigate }: { active: 'home' | 'rooms
   </View>;
 }
 
-function RoomListCard({ room, onPress, home = false }: { room: Room; onPress: () => void; home?: boolean }) {
-  const label = room.status === 'RECRUITING' && room.participantCount >= room.capacity ? '모집 완료' : roomStatusLabels[room.status];
+function RoomListCard({ room, onPress, home = false, past = false }: { room: Room; onPress: () => void; home?: boolean; past?: boolean }) {
+  const label = past ? '출발 시간 지남' : room.status === 'RECRUITING' && room.participantCount >= room.capacity ? '모집 완료' : roomStatusLabels[room.status];
   return <Pressable accessibilityRole="button" onPress={onPress}><Card style={{ backgroundColor: c.white, padding: 12 }}>
     <View style={[ui.between, { alignItems: 'flex-start' }]}><View style={{ flex: 1, minWidth: 0, gap: 5 }}><Text style={ui.body}><Text style={ui.muted}>출발　</Text><Text style={ui.bold}>{room.origin.name}</Text></Text><Text style={ui.body}><Text style={[ui.muted, ui.blue]}>도착　</Text><Text style={ui.bold}>{room.destination.name}</Text></Text></View>{home && <Icon name="next" color={c.faint} />}</View>
-    <View style={[ui.between, { alignItems: 'flex-start', gap: 8 }]}><View style={{ flex: 1, minWidth: 0 }}><Text style={ui.muted}>출발 시간 <Text style={ui.bold}>{departureLabel(room.departureAt)}</Text></Text><Text style={ui.muted}>모집 인원 <Text style={ui.bold}>{room.capacity}명</Text>　현재 참여 <Text style={[ui.blue, { fontWeight: '700' }]}>{room.participantCount}명</Text></Text></View><View style={{ flexShrink: 0, backgroundColor: room.status === 'RECRUITING' && room.participantCount < room.capacity ? c.blue : c.tint, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 11 }}><Text style={{ color: room.status === 'RECRUITING' && room.participantCount < room.capacity ? c.white : c.blue, fontSize: 12, fontWeight: '700' }}>{label}</Text></View></View>
+    <View style={[ui.between, { alignItems: 'flex-start', gap: 8 }]}><View style={{ flex: 1, minWidth: 0 }}><Text style={ui.muted}>출발 시간 <Text style={ui.bold}>{departureLabel(room.departureAt)}</Text></Text><Text style={ui.muted}>모집 인원 <Text style={ui.bold}>{room.capacity}명</Text>　현재 참여 <Text style={[ui.blue, { fontWeight: '700' }]}>{room.participantCount}명</Text></Text></View><View style={{ flexShrink: 0, backgroundColor: !past && room.status === 'RECRUITING' && room.participantCount < room.capacity ? c.blue : c.tint, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 11 }}><Text style={{ color: !past && room.status === 'RECRUITING' && room.participantCount < room.capacity ? c.white : c.blue, fontSize: 12, fontWeight: '700' }}>{label}</Text></View></View>
   </Card></Pressable>;
 }
 
 export function RoomListScreen({ rooms, navigate, onSearch, home = false, error, loading = false, refresh, initialSearch = {} }: { rooms: Room[]; navigate: Navigate; onSearch?: (filter: Record<string, string>) => void; home?: boolean; error?: string | null; loading?: boolean; refresh?: () => void; initialSearch?: Record<string, string> }) {
+  const now = useCurrentTime();
   const [origin, setOrigin] = useState(initialSearch.origin ?? ''); const [destination, setDestination] = useState(initialSearch.destination ?? ''); const [period, setPeriod] = useState(initialSearch.period ?? '전체'); const [showFilter, setShowFilter] = useState(false);
   const [filter, setFilter] = useState({ origin: initialSearch.origin ?? '', destination: initialSearch.destination ?? '', period: initialSearch.period ?? '전체' });
   // Production results are already fully filtered by the server. Preview fixtures remain local.
   const visible = onSearch ? rooms : rooms.filter(room => { const hour = new Date(new Date(room.departureAt).getTime() + 9 * 3600000).getUTCHours(); return room.origin.name.includes(filter.origin) && room.destination.name.includes(filter.destination) && (filter.period === '전체' || (filter.period === '오전' && hour < 12) || (filter.period === '오후' && hour >= 12 && hour < 18) || (filter.period === '저녁' && hour >= 18)); });
+  const newestFirst = (items: Room[]) => [...items].sort((a, b) => b.roomId - a.roomId);
+  const recruiting = newestFirst(visible.filter(room => room.status === 'RECRUITING' && new Date(room.departureAt).getTime() > now));
+  const inProgress = newestFirst(visible.filter(room => room.status !== 'RECRUITING'));
+  const past = newestFirst(visible.filter(room => room.status === 'RECRUITING' && new Date(room.departureAt).getTime() <= now));
+  const homeRooms = onSearch ? recruiting.slice(0, 3) : visible;
   const search = () => { const next = { origin: origin.trim(), destination: destination.trim(), period }; setFilter(next); if (!home) onSearch?.(next); };
   const clearSearch = () => { setOrigin(''); setDestination(''); setPeriod('전체'); setFilter({ origin: '', destination: '', period: '전체' }); onSearch?.({ origin: '', destination: '', period: '전체' }); refresh?.(); };
   const hasActiveFilter = Boolean(initialSearch.origin || initialSearch.destination || (initialSearch.period && initialSearch.period !== '전체'));
@@ -50,11 +56,20 @@ export function RoomListScreen({ rooms, navigate, onSearch, home = false, error,
     </View>
     {!home && hasActiveFilter && <View style={[ui.between, { alignItems: 'flex-start', gap: 8 }]}><Text style={[ui.muted, { flex: 1, minWidth: 0 }]}>검색 조건: {initialSearch.origin || '전체 출발지'} → {initialSearch.destination || '전체 목적지'} · {initialSearch.period || '전체 시간'}</Text><Button secondary small onPress={clearSearch}>조건 지우기</Button></View>}
     {home && <View style={ui.row}>{['택시방 만들기', '택시방 찾기'].map((label, index) => <Pressable key={label} accessibilityRole="button" onPress={() => navigate(index === 0 ? 'create' : 'rooms')} style={{ flex: 1, minHeight: 56, backgroundColor: c.tint, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 }}><Icon name={index === 0 ? 'plus' : 'people'} size={20} /><Text style={[ui.label, ui.blue]}>{label}</Text></Pressable>)}</View>}
-    <View style={[ui.between, { marginTop: 4 }]}><Text style={ui.heading}>택시방{!home && <Text style={ui.blue}> {visible.length}</Text>}</Text><View style={ui.row}>{refresh && <Button secondary small busy={loading} onPress={refresh}>새로고침</Button>}{home && <Pressable onPress={() => navigate('rooms')}><Text style={ui.muted}>더보기 ›</Text></Pressable>}</View></View>
+    <View style={[ui.between, { marginTop: 4 }]}><Text style={ui.heading}>{home ? '모집 중인 택시방' : '택시방'}{!home && <Text style={ui.blue}> {visible.length}</Text>}</Text><View style={ui.row}>{refresh && <Button secondary small busy={loading} onPress={refresh}>새로고침</Button>}{home && <Pressable onPress={() => navigate('rooms')}><Text style={ui.muted}>더보기 ›</Text></Pressable>}</View></View>
     {error && <View style={ui.column}><Notice error>{error}</Notice><Button secondary small onPress={() => refresh?.()}>다시 불러오기</Button></View>}
     {loading && <Notice>택시방을 불러오고 있어요.</Notice>}
-    {visible.map(room => <RoomListCard key={room.roomId} room={room} home={home} onPress={() => navigate('detail', room.roomId)} />)}
-    {!loading && !error && visible.length === 0 && <Card><Notice>조건에 맞는 택시방이 없습니다.</Notice><Button secondary small onPress={() => navigate('create')}>새 택시방 만들기</Button></Card>}
+    {home ? homeRooms.map(room => <RoomListCard key={room.roomId} room={room} home onPress={() => navigate('detail', room.roomId)} />) : (
+      <>
+        {recruiting.length > 0 && <Text style={ui.heading}>지금 모집 중 · {recruiting.length}개</Text>}
+        {recruiting.map(room => <RoomListCard key={room.roomId} room={room} onPress={() => navigate('detail', room.roomId)} />)}
+        {inProgress.length > 0 && <Text style={ui.heading}>진행 중 · {inProgress.length}개</Text>}
+        {inProgress.map(room => <RoomListCard key={room.roomId} room={room} onPress={() => navigate('detail', room.roomId)} />)}
+        {past.length > 0 && <Text style={ui.heading}>출발 시간이 지난 방 · {past.length}개</Text>}
+        {past.map(room => <RoomListCard key={room.roomId} room={room} past onPress={() => navigate('detail', room.roomId)} />)}
+      </>
+    )}
+    {!loading && !error && (home ? homeRooms.length === 0 : visible.length === 0) && <Card><Notice>{home ? '현재 모집 중인 택시방이 없습니다.' : '조건에 맞는 택시방이 없습니다.'}</Notice><Button secondary small onPress={() => navigate('create')}>새 택시방 만들기</Button></Card>}
     <Modal visible={showFilter} transparent animationType="slide" onRequestClose={() => setShowFilter(false)}><View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#00000044' }}><Card style={{ backgroundColor: c.white, paddingBottom: 32 }}><Text style={ui.heading}>출발 시간 선택</Text>{['전체', '오전', '오후', '저녁'].map(value => <Pressable accessibilityRole="button" key={value} onPress={() => { setPeriod(value); setShowFilter(false); }} style={{ padding: 14 }}><Text style={ui.body}>{value}{period === value ? '　✓' : ''}</Text></Pressable>)}<Button secondary onPress={() => setShowFilter(false)}>닫기</Button></Card></View></Modal>
   </Screen>;
 }

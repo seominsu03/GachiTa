@@ -47,6 +47,8 @@ public class RoomService {
         var room = lockHostRoom(roomId, userId);
         if (!room.getDepartureAt().isAfter(Instant.now())) throw new ApiException(HttpStatus.CONFLICT, "ROOM_NOT_RECRUITING", "출발 시간이 지난 방의 정원은 변경할 수 없습니다.");
         if (capacity < 2 || capacity > 4) throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "방장 포함 2~4명을 선택해 주세요.");
+        if (room.getParticipantCount() >= room.getCapacity())
+            throw new ApiException(HttpStatus.CONFLICT, "ROOM_FULL", "모집 인원이 모두 찬 방은 정원을 다시 변경할 수 없습니다.");
         if (capacity < room.getParticipantCount()) throw new ApiException(HttpStatus.CONFLICT, "CAPACITY_BELOW_PARTICIPANTS", "확정된 참여 인원보다 적게 설정할 수 없습니다.");
         room.setCapacity(capacity);
         return RoomResponse.from(room);
