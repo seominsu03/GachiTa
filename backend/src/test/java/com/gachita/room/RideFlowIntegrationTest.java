@@ -252,7 +252,8 @@ class RideFlowIntegrationTest {
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
             var actual = new ArrayList<Long>();
             json.readTree(response).get("data").forEach(room -> actual.add(room.get("roomId").asLong()));
-            assertThat(actual).containsExactlyElementsOf(entry.getValue());
+            // The active room list is ordered by latest departure first.
+            assertThat(actual).containsExactlyElementsOf(entry.getValue().reversed());
         }
     }
     @Test void searchRejectsUnknownPeriodAndTreatsNamesAsLiteralSubstrings() throws Exception {

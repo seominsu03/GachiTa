@@ -12,14 +12,14 @@ public interface RoomRepository extends JpaRepository<TaxiRoom, Long> {
     // Every predicate is applied in SQL BEFORE Pageable limits the result to 100 rows.
     @Query("""
             select r from TaxiRoom r join fetch r.host
-            where r.status = :status and r.departureAt > CURRENT_TIMESTAMP
+            where r.status not in :excludedStatuses
               and locate(lower(:origin), lower(r.originName)) > 0
               and locate(lower(:destination), lower(r.destinationName)) > 0
               and mod(hour(r.departureAt) + 9, 24) >= :startHour
               and mod(hour(r.departureAt) + 9, 24) < :endHour
-            order by r.departureAt, r.roomId
+            order by r.departureAt desc, r.roomId desc
             """)
-    List<TaxiRoom> search(@Param("status") RoomStatus status, @Param("origin") String origin,
+    List<TaxiRoom> search(@Param("excludedStatuses") Collection<RoomStatus> excludedStatuses, @Param("origin") String origin,
                          @Param("destination") String destination, @Param("startHour") int startHour,
                          @Param("endHour") int endHour, Pageable pageable);
     @Query("select r from TaxiRoom r join fetch r.host where r.status <> :excludedStatus and (r.host.userId = :userId or exists (select p.participationId from Participation p where p.room = r and p.user.userId = :userId and p.status in :statuses)) order by r.departureAt desc, r.roomId desc")

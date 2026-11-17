@@ -25,7 +25,7 @@ public class RoomService {
     }
     @Transactional(readOnly = true) public List<RoomResponse> getRooms(String origin, String destination, String period) {
         var departurePeriod = DeparturePeriod.parse(period);
-        return rooms.search(RoomStatus.RECRUITING, origin.strip(), destination.strip(),
+        return rooms.search(List.of(RoomStatus.COMPLETED, RoomStatus.CANCELLED), origin.strip(), destination.strip(),
                 departurePeriod.startHour(), departurePeriod.endHour(), PageRequest.of(0, 100))
                 .stream().map(RoomResponse::from).toList();
     }

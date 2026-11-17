@@ -2,6 +2,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { Card, Icon, ui } from '@/components/ui/DesignSystem';
 import { design as c } from '@/constants/design';
 import type { Member, Room } from '@/types/room';
+import { roomStatusLabels } from '@/features/rooms/presentation';
 
 export const timeLabel = (value: string) => new Date(value).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul' });
 export const dateLabel = (value: string) => new Date(value).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Seoul' });
@@ -36,10 +37,11 @@ export function RoomSummary({ room, detailed = false, compact = false }: { room:
 
 export function CapacityCard({ room, management = false }: { room: Room; management?: boolean }) {
   const full = room.participantCount >= room.capacity;
-  return <Card tinted style={{ gap: 8 }}><View style={ui.between}><Text style={ui.bold}>{full ? '모집 완료' : management ? '현재 참여' : '모집 현황'}</Text><Text style={{ fontSize: 21, lineHeight: 24, color: c.blue, fontWeight: '700' }}>{room.participantCount} / {room.capacity}명</Text></View>
+  const recruiting = room.status === 'RECRUITING';
+  return <Card tinted style={{ gap: 8 }}><View style={ui.between}><Text style={ui.bold}>{recruiting ? full ? '모집 완료' : management ? '현재 참여' : '모집 현황' : roomStatusLabels[room.status]}</Text><Text style={{ fontSize: 21, lineHeight: 24, color: c.blue, fontWeight: '700' }}>{room.participantCount} / {room.capacity}명</Text></View>
     <View style={styles.progress}>{Array.from({ length: room.capacity }, (_, index) => <View key={index} style={[styles.segment, index < room.participantCount && { backgroundColor: c.blue }]} />)}</View>
     {!management && <View style={ui.between}><Text style={ui.muted}>모집 인원 <Text style={ui.bold}>{room.capacity}명</Text></Text><Text style={ui.muted}>현재 참여 인원 <Text style={ui.blue}>{room.participantCount}명</Text></Text></View>}
-    <Text style={[ui.muted, ui.blue, { lineHeight: 14 }]}>{full ? '정원이 찼어요. 채팅에서 출발을 준비해요.' : `${management ? '방장 포함 · ' : ''}남은 모집 인원 ${room.capacity - room.participantCount}명`}</Text>
+    <Text style={[ui.muted, ui.blue, { lineHeight: 14 }]}>{recruiting ? full ? '정원이 찼어요. 채팅에서 출발을 준비해요.' : `${management ? '방장 포함 · ' : ''}남은 모집 인원 ${room.capacity - room.participantCount}명` : '탑승 및 정산 진행 상태를 확인해 주세요.'}</Text>
   </Card>;
 }
 
