@@ -4,12 +4,12 @@ import { StyleSheet, Text } from 'react-native';
 import { formatBoardingTime, getRemainingSeconds } from '@/features/boarding/countdown';
 import { CHAT_COLORS as colors } from '@/features/chat/theme';
 
-type Props = { expiresAt: number; onExpire: () => void };
+type Props = { expiresAt: number; serverClockOffsetMs: number; onExpire: () => void };
 
-export function BoardingCountdown({ expiresAt, onExpire }: Props) {
+export function BoardingCountdown({ expiresAt, serverClockOffsetMs, onExpire }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const expiryReportedRef = useRef(false);
-  const remaining = getRemainingSeconds(expiresAt, now);
+  const remaining = getRemainingSeconds(expiresAt, now + serverClockOffsetMs);
 
   useEffect(() => {
     expiryReportedRef.current = false;

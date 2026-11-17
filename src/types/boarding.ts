@@ -1,8 +1,12 @@
-// Temporary UI state for the local boarding preview. Server DTOs are separate.
-type BoardingDemoRequest = { requestedAt: number; expiresAt: number };
+export type BoardingCheckStatus = 'PENDING' | 'COMPLETED' | 'EXPIRED';
+export type BoardingResponseStatus = 'PENDING' | 'ACCEPTED' | 'TIMED_OUT' | 'CANCELLED';
 
-export type BoardingDemoState =
-  | { status: 'idle' }
-  | (BoardingDemoRequest & { status: 'pending' })
-  | (BoardingDemoRequest & { status: 'accepted' | 'declined'; respondedAt: number })
-  | (BoardingDemoRequest & { status: 'expired' });
+export type BoardingCheck = {
+  boardingCheckId: number;
+  roomId: number;
+  requestedAt: string;
+  expiresAt: string;
+  serverNow: string;
+  status: BoardingCheckStatus;
+  responses: { userId: number; status: BoardingResponseStatus; respondedAt: string | null }[];
+};

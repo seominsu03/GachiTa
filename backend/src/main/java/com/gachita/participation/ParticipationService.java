@@ -1,5 +1,6 @@
 package com.gachita.participation;
 import com.gachita.common.ApiException;
+import com.gachita.boarding.BoardingService;
 import com.gachita.room.*;
 import com.gachita.user.UserRepository;
 import java.time.Instant;
@@ -10,8 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service @Transactional
 public class ParticipationService {
-    private final RoomRepository rooms; private final UserRepository users; private final ParticipationRepository members;
-    public ParticipationService(RoomRepository rooms, UserRepository users, ParticipationRepository members) { this.rooms = rooms; this.users = users; this.members = members; }
+    private final RoomRepository rooms; private final UserRepository users; private final ParticipationRepository members; private final BoardingService boarding;
+    public ParticipationService(RoomRepository rooms, UserRepository users, ParticipationRepository members, BoardingService boarding) { this.rooms = rooms; this.users = users; this.members = members; this.boarding = boarding; }
     private ApiException error(HttpStatus status, String code, String message) { return new ApiException(status, code, message); }
     private TaxiRoom lock(Long roomId) { return rooms.findLockedById(roomId).orElseThrow(() -> error(HttpStatus.NOT_FOUND, "ROOM_NOT_FOUND", "택시방이 없습니다.")); }
     private void recruiting(TaxiRoom room) {
@@ -38,7 +39,10 @@ public class ParticipationService {
         if (target == ParticipationStatus.CANCELLED) {
             if (!member.getUser().getUserId().equals(userId)) throw error(HttpStatus.FORBIDDEN, "FORBIDDEN", "본인의 신청만 취소할 수 있습니다.");
             if ((room.getStatus() != RoomStatus.RECRUITING && room.getStatus() != RoomStatus.BOARDING_CHECK) || (member.getStatus() != ParticipationStatus.PENDING && member.getStatus() != ParticipationStatus.APPROVED)) throw error(HttpStatus.CONFLICT, "CANCEL_NOT_ALLOWED", "탑승 수락 전의 신청만 취소할 수 있습니다.");
-            if (member.getStatus() == ParticipationStatus.APPROVED) room.setParticipantCount(room.getParticipantCount() - 1);
+            if (member.getStatus() == ParticipationStatus.APPROVED) {
+                room.setParticipantCount(room.getParticipantCount() - 1);
+                boarding.markCancelled(roomId, userId);
+            }
         } else {
             if (!room.getHost().getUserId().equals(userId)) throw error(HttpStatus.FORBIDDEN, "FORBIDDEN", "방장만 처리할 수 있습니다.");
             recruiting(room);

@@ -9,7 +9,7 @@ import { departureLabel, roomStatusLabels } from '@/features/rooms/presentation'
 import type { LocationInfo } from '@/types/contracts';
 
 export type Navigate = (screen: string, roomId?: number, search?: Record<string, string>) => void;
-export function BottomNavigation({ active, navigate }: { active: 'home' | 'rooms' | 'mypage'; navigate: Navigate }) {
+export function BottomNavigation({ active, navigate }: { active: 'home' | 'rooms' | 'chats' | 'mypage'; navigate: Navigate }) {
   return <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: c.line, paddingTop: 8, paddingBottom: 20, backgroundColor: c.white }}>
     {(['home', 'rooms', 'chats', 'mypage'] as const).map((name, index) => <Pressable key={name} accessibilityRole="button" accessibilityState={{ selected: name === active }} accessibilityLabel={['홈', '택시방', '채팅', '내 정보'][index]} onPress={() => navigate(name)} style={{ flex: 1, alignItems: 'center', gap: 3, minHeight: 40 }}>
       <Icon name={(['home', 'car', 'chat', 'user'] as const)[index]} color={name === active ? c.blue : c.faint} /><Text style={{ fontSize: 11, color: name === active ? c.blue : c.muted }}>{['홈', '택시방', '채팅', '내 정보'][index]}</Text>
@@ -18,9 +18,10 @@ export function BottomNavigation({ active, navigate }: { active: 'home' | 'rooms
 }
 
 function RoomListCard({ room, onPress, home = false }: { room: Room; onPress: () => void; home?: boolean }) {
+  const label = room.status === 'RECRUITING' && room.participantCount >= room.capacity ? '모집 완료' : roomStatusLabels[room.status];
   return <Pressable accessibilityRole="button" onPress={onPress}><Card style={{ backgroundColor: c.white, padding: 12 }}>
     <View style={ui.between}><View style={{ gap: 5 }}><Text style={ui.body}><Text style={ui.muted}>출발　</Text><Text style={ui.bold}>{room.origin.name}</Text></Text><Text style={ui.body}><Text style={[ui.muted, ui.blue]}>도착　</Text><Text style={ui.bold}>{room.destination.name}</Text></Text></View>{home && <Icon name="next" color={c.faint} />}</View>
-    <View style={ui.between}><View><Text style={ui.muted}>출발 시간 <Text style={ui.bold}>{departureLabel(room.departureAt)}</Text></Text><Text style={ui.muted}>모집 인원 <Text style={ui.bold}>{room.capacity}명</Text>　현재 참여 <Text style={[ui.blue, { fontWeight: '700' }]}>{room.participantCount}명</Text></Text></View>{!home && <View style={{ backgroundColor: c.blue, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 11 }}><Text style={{ color: c.white, fontSize: 12, fontWeight: '700' }}>동승 신청</Text></View>}</View>
+    <View style={ui.between}><View><Text style={ui.muted}>출발 시간 <Text style={ui.bold}>{departureLabel(room.departureAt)}</Text></Text><Text style={ui.muted}>모집 인원 <Text style={ui.bold}>{room.capacity}명</Text>　현재 참여 <Text style={[ui.blue, { fontWeight: '700' }]}>{room.participantCount}명</Text></Text></View><View style={{ backgroundColor: room.status === 'RECRUITING' && room.participantCount < room.capacity ? c.blue : c.tint, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 11 }}><Text style={{ color: room.status === 'RECRUITING' && room.participantCount < room.capacity ? c.white : c.blue, fontSize: 12, fontWeight: '700' }}>{label}</Text></View></View>
   </Card></Pressable>;
 }
 
@@ -37,7 +38,7 @@ export function RoomListScreen({ rooms, navigate, onSearch, home = false, error,
       {home && <Button onPress={() => { search(); navigate('rooms', undefined, { origin: origin.trim(), destination: destination.trim(), period }); }}>⌕  택시방 검색</Button>}
     </View>
     {home && <View style={ui.row}>{['택시방 만들기', '택시방 찾기'].map((label, index) => <Pressable key={label} accessibilityRole="button" onPress={() => navigate(index === 0 ? 'create' : 'rooms')} style={{ flex: 1, minHeight: 56, backgroundColor: c.tint, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 }}><Icon name={index === 0 ? 'plus' : 'people'} size={20} /><Text style={[ui.label, ui.blue]}>{label}</Text></Pressable>)}</View>}
-    <View style={[ui.between, { marginTop: 4 }]}><Text style={ui.heading}>모집 중인 택시방{!home && <Text style={ui.blue}> {visible.length}</Text>}</Text><View style={ui.row}>{refresh && <Button secondary small busy={loading} onPress={refresh}>새로고침</Button>}{home && <Pressable onPress={() => navigate('rooms')}><Text style={ui.muted}>더보기 ›</Text></Pressable>}</View></View>
+    <View style={[ui.between, { marginTop: 4 }]}><Text style={ui.heading}>택시방{!home && <Text style={ui.blue}> {visible.length}</Text>}</Text><View style={ui.row}>{refresh && <Button secondary small busy={loading} onPress={refresh}>새로고침</Button>}{home && <Pressable onPress={() => navigate('rooms')}><Text style={ui.muted}>더보기 ›</Text></Pressable>}</View></View>
     {error && <View style={ui.column}><Notice error>{error}</Notice><Button secondary small onPress={() => refresh?.()}>다시 불러오기</Button></View>}
     {loading && <Notice>택시방을 불러오고 있어요.</Notice>}
     {visible.map(room => <RoomListCard key={room.roomId} room={room} home={home} onPress={() => navigate('detail', room.roomId)} />)}
@@ -55,10 +56,10 @@ export function RoomDetailScreen({ onUpdateCapacity, onDeleteRoom, onRefresh, ro
   return <Screen title="택시방 상세" right={onRefresh && <Button secondary small onPress={onRefresh}>새로고침</Button>} footer={<View style={ui.column}>
     {error && <Notice error>{error}</Notice>}
     {host ? <Button onPress={() => navigate('participants', room.roomId)}>동승자 관리</Button>
-      : own ? <><Text style={[ui.muted, { textAlign: 'center' }]}>{own.status === 'PENDING' ? '신청이 접수되었어요.\n방장 승인 후 참여가 확정돼요.' : '동승이 확정되었어요.'}</Text><Card tinted style={{ alignItems: 'center' }}><Text style={[ui.blue, { fontSize: 17, fontWeight: '700' }]}>✓　{own.status === 'PENDING' ? '신청 완료' : '동승 확정'}</Text></Card>{canCancel && own.status !== 'BOARDING_CONFIRMED' && <Button secondary small busy={busy} onPress={() => onCancel(own.participationId)}>신청 취소</Button>}</>
+      : own ? <><Text style={[ui.muted, { textAlign: 'center' }]}>{own.status === 'PENDING' ? '신청이 접수되었어요.\n방장 승인 후 참여가 확정돼요.' : '동승이 확정되었어요.'}</Text><Card tinted style={{ alignItems: 'center' }}><Text style={[ui.blue, { fontSize: 17, fontWeight: '700' }]}>✓　{own.status === 'PENDING' ? '신청 완료' : '동승 확정'}</Text></Card>{own.status !== 'PENDING' && <Button onPress={() => navigate('chat', room.roomId)}>채팅방으로 이동</Button>}{canCancel && own.status !== 'BOARDING_CONFIRMED' && <Button secondary small busy={busy} onPress={() => onCancel(own.participationId)}>신청 취소</Button>}</>
         : <><Text style={[ui.muted, { textAlign: 'center' }]}>동승 신청 후 방장의 승인을 기다려 주세요.{'\n'}승인 후 참여가 확정돼요.</Text><Button onPress={onRequest} busy={busy} disabled={timedOut || room.participantCount >= room.capacity || room.status !== 'RECRUITING'}>{timedOut ? '탑승 미응답으로 재참여할 수 없어요' : '동승 신청'}</Button></>}
   </View>}>
-    <Text style={ui.badge}>{roomStatusLabels[room.status]}</Text><RoomSummary room={room} detailed /><CapacityCard room={room} />
+    <Text style={ui.badge}>{room.status === 'RECRUITING' && room.participantCount >= room.capacity ? '모집 완료' : roomStatusLabels[room.status]}</Text><RoomSummary room={room} detailed /><CapacityCard room={room} />
     {host && onUpdateCapacity && onDeleteRoom && <HostRoomControls room={room} busy={busy} onUpdate={onUpdateCapacity} onDelete={onDeleteRoom} />}
     <Text style={ui.heading}>방장 정보</Text><MemberRow member={room.host} badge="방장" />
     <View style={ui.between}><Text style={ui.heading}>동승자 정보</Text><Text style={ui.muted}>{approved.length}명 참여 중</Text></View>{approved.map(member => <MemberRow key={member.userId} member={member} />)}
@@ -68,8 +69,7 @@ export function RoomDetailScreen({ onUpdateCapacity, onDeleteRoom, onRefresh, ro
 
 export function ParticipantsScreen({ onUpdateCapacity, onDeleteRoom, onRefresh, room, participations, navigate, busy, error, onApprove, onReject }: { room: Room; participations: Participation[]; navigate: Navigate; busy?: boolean; error?: string | null; onRefresh?: () => void; onUpdateCapacity?: (capacity: number) => Promise<void>; onDeleteRoom?: () => Promise<void>; onApprove: (id: number) => void; onReject: (id: number) => void }) {
   const pending = participations.filter(p => p.status === 'PENDING'); const approved = participations.filter(p => p.status === 'APPROVED' || p.status === 'BOARDING_CONFIRMED');
-  const [showChat, setShowChat] = useState(false);
-  return <Screen title="동승자 관리" right={onRefresh && <Button secondary small onPress={onRefresh}>새로고침</Button>} contentGap={12} footer={<Button onPress={() => setShowChat(true)}>채팅</Button>}>
+  return <Screen title="동승자 관리" right={onRefresh && <Button secondary small onPress={onRefresh}>새로고침</Button>} contentGap={12} footer={<Button onPress={() => navigate('chat', room.roomId)}>채팅방으로 이동</Button>}>
     <RoomSummary room={room} /><CapacityCard room={room} management />
     {onUpdateCapacity && onDeleteRoom && <HostRoomControls room={room} busy={busy} onUpdate={onUpdateCapacity} onDelete={onDeleteRoom} />}
     <View style={ui.between}><Text style={ui.heading}>동승 신청자</Text><Text style={[ui.muted, ui.blue]}>{pending.length}명</Text></View>
@@ -78,7 +78,6 @@ export function ParticipantsScreen({ onUpdateCapacity, onDeleteRoom, onRefresh, 
     {pending.length === 0 && <Card style={{ alignItems: 'center', paddingVertical: 22 }}><Text style={ui.body}>대기 중인 신청자가 없어요.</Text><Text style={ui.muted}>{room.participantCount >= room.capacity ? '모든 동승자가 확정되었어요.' : '새로운 동승 신청을 기다리고 있어요.'}</Text></Card>}
     <View style={ui.between}><Text style={ui.heading}>현재 동승자</Text><Text style={ui.muted}>{approved.length}명 참여 중</Text></View><Text style={[ui.muted, { fontSize: 11, marginTop: -12 }]}>방장 본인({room.host.nickname})은 목록에서 제외돼요.</Text>
     <View style={{ gap: 8 }}>{approved.map(member => <MemberRow key={member.userId} member={member}><Text style={ui.badge}>동승 확정</Text></MemberRow>)}</View>
-    <Modal visible={showChat} transparent animationType="fade" onRequestClose={() => setShowChat(false)}><View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#00000055' }}><Card><Text style={ui.heading}>채팅 화면 연결</Text><Text style={ui.body}>채팅은 팀원 B의 담당 화면입니다. 현재 화면과 데이터는 유지되며, B의 채팅 구현 후 연결할 수 있어요.</Text><Button onPress={() => { setShowChat(false); navigate('detail', room.roomId); }}>확인</Button></Card></View></Modal>
   </Screen>;
 }
 

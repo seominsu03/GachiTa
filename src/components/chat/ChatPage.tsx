@@ -4,6 +4,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CHAT_COLORS as colors } from '@/features/chat/theme';
+import { BottomNavigation } from '@/components/rooms/RoomScreens';
+import { navigateRoom } from '@/components/rooms/RoomRoute';
 
 type Props = PropsWithChildren<{ title: string; subtitle?: string; onBack: () => void }>;
 
@@ -20,6 +22,7 @@ export function ChatPage({ children, title, subtitle, onBack }: Props) {
           <View style={styles.badge}><Text style={styles.badgeText}>채팅 시연</Text></View>
         </View>
         {children}
+        <BottomNavigation active="chats" navigate={navigateRoom} />
       </View>
     </SafeAreaView>
   );

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Text } from 'react-native';
 import { Button, Notice, Screen, ui } from '@/components/ui/DesignSystem';
 import { CreateRoomScreen, ParticipantsScreen, RoomDetailScreen, RoomListScreen, type Navigate } from './RoomScreens';
@@ -17,6 +17,7 @@ export const navigateRoom: Navigate = (screen, roomId, search) => {
   if (screen === 'home') router.push('/(tabs)');
   else if (screen === 'rooms') router.push({ pathname: '/(tabs)/rooms', params: search });
   else if (screen === 'chats') router.push('/(tabs)/chats');
+  else if (screen === 'chat') router.push({ pathname: '/rooms/[roomId]/chat', params: { roomId: String(roomId) } });
   else if (screen === 'mypage') router.push('/(tabs)/mypage');
   else if (screen === 'create') router.push('/rooms/create');
   else if (screen === 'detail') router.push({ pathname: '/rooms/[roomId]', params: { roomId: String(roomId) } });
@@ -62,6 +63,13 @@ export function RoomRoute({ screen }: { screen: 'detail' | 'participants' | Sett
     return { room, members, bill };
   }, [roomId, isSettlement, userId]);
   const remote = useRemote(load);
+  const awaitingApproval = screen === 'detail' && remote.data?.members.some(member => member.userId === userId && member.status === 'PENDING');
+  const refresh = remote.refresh;
+  useFocusEffect(useCallback(() => {
+    if (!awaitingApproval) return;
+    const timer = setInterval(() => void refresh(), 3000);
+    return () => clearInterval(timer);
+  }, [awaitingApproval, refresh]));
   if (!remote.data) return <Screen title="택시방"><Text style={ui.body}>{remote.loading ? '불러오는 중…' : '택시방을 불러오지 못했어요.'}</Text>{remote.error && <Notice error>{remote.error}</Notice>}<Button secondary onPress={() => void remote.refresh()}>다시 불러오기</Button></Screen>;
   const { room, members, bill } = remote.data;
   const mutate = (action: () => Promise<unknown>, next?: string) => void mutation.run(async () => { await action(); await remote.refresh(); if (next) navigateRoom(next, roomId); }).catch(() => {});
