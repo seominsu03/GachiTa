@@ -1,8 +1,6 @@
 # 같이타 실행 안내
 
-확인일: 2026-11-16. Windows PowerShell 기준입니다.
-
-실제 프로젝트: C:\Users\user\gachita\GachiTa
+갱신일: 2026-11-17. 아래 명령은 Windows PowerShell 기준이며, 프로젝트 루트는 이 파일의 상위 폴더입니다. 로컬 프로젝트 예시: `D:\ReactNative\GachiTa`. CMD 사용자는 `cd /d D:\ReactNative\GachiTa`로 이동합니다.
 
 Node.js와 JDK 21이 필요합니다. Maven은 저장소의 Wrapper를 사용합니다. 처음 실행하는 환경은 npm ci와 Maven 의존성 다운로드에 네트워크가 필요합니다. node_modules가 이미 있고 의존성을 바꾸지 않았다면 npm ci를 반복하지 않아도 됩니다.
 
@@ -11,7 +9,7 @@ Node.js와 JDK 21이 필요합니다. Maven은 저장소의 Wrapper를 사용합
 터미널 1에서:
 
 ~~~powershell
-Set-Location C:\Users\user\gachita\GachiTa\backend
+Set-Location D:\ReactNative\GachiTa\backend
 $env:JAVA_HOME='C:\Program Files\Java\jdk-21.0.12.1'
 .\mvnw.cmd spring-boot:run "-Dspring-boot.run.useTestClasspath=true" "-Dspring-boot.run.profiles=demo"
 ~~~
@@ -27,7 +25,7 @@ JAVA_HOME은 설치된 JDK 21 경로에 맞춥니다. 로그에 demo 프로필, 
 터미널 2에서:
 
 ~~~powershell
-Set-Location C:\Users\user\gachita\GachiTa
+Set-Location D:\ReactNative\GachiTa
 # 처음 설치할 때만: npm ci
 $env:EXPO_PUBLIC_API_URL='http://localhost:8080'
 npx expo start --web --port 8081 --localhost
@@ -69,7 +67,7 @@ Windows 설치와 DB·계정 접속 확인 기록은 [MYSQL_SETUP.md](MYSQL_SETU
 MySQL에 gachita DB와 전용 계정을 먼저 준비합니다. 기존 DB는 백업·스키마 비교 후 사용하며 삭제하지 않습니다.
 
 ~~~powershell
-Set-Location C:\Users\user\gachita\GachiTa\backend
+Set-Location D:\ReactNative\GachiTa\backend
 $env:JAVA_HOME='C:\Program Files\Java\jdk-21.0.12.1'
 $env:DB_URL='jdbc:mysql://localhost:3306/gachita?serverTimezone=UTC&characterEncoding=UTF-8'
 $env:DB_USERNAME='gachita'
@@ -77,9 +75,9 @@ $env:DB_PASSWORD='자신의 로컬 DB 비밀번호'
 .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev"
 ~~~
 
-dev는 schema.sql과 db/migrations/20261111_room_settlement.sql로 없는 테이블을 생성합니다. 테이블은 users, taxi_rooms, participations, settlements, settlement_receipts입니다. 기존 users 테이블에 name/phone_number가 없다면 db/migrations/20261111_user_contact.sql을 검토 후 한 번만 적용합니다. 이 ALTER 스크립트는 자동 실행되지 않습니다.
+dev는 schema.sql, db/migrations/20261111_room_settlement.sql, db/migrations/20261117_boarding.sql로 없는 테이블을 생성합니다. 주요 테이블은 users, taxi_rooms, participations, settlements, settlement_receipts, boarding_checks, boarding_responses입니다. 기존 users 테이블에 name/phone_number가 없다면 db/migrations/20261111_user_contact.sql을 검토 후 한 번만 적용합니다. 이 ALTER 스크립트는 자동 실행되지 않습니다.
 
-기본 프로필은 스키마를 자동 생성하지 않고 검증하며 Secure 쿠키를 사용하므로 HTTPS가 필요합니다. .env.example과 backend/.env.example은 참고 파일이며 Spring에서 자동 로드되지 않습니다. DB 비밀번호를 커밋하지 않습니다.
+기본 프로필은 스키마를 자동 생성하지 않고 검증하며 Secure 쿠키를 사용하므로 HTTPS가 필요합니다. `.env.example`과 `backend/.env.example`은 참고 파일입니다. dev 프로필은 `backend/.env.local`을 선택적으로 읽습니다. DB 비밀번호와 `KAKAO_REST_API_KEY`는 로컬 파일에 보관하고 커밋하지 않습니다.
 
 ## 5. 모바일 실행
 
@@ -91,7 +89,7 @@ dev는 schema.sql과 db/migrations/20261111_room_settlement.sql로 없는 테이
 | Android 기본 에뮬레이터 | http://10.0.2.2:8080 |
 | 실물 휴대폰 | http://PC의_LAN_IP:8080 |
 
-주소에 /api/v1을 붙이지 않습니다. 휴대폰용으로 환경 변수를 설정한 후 npx expo start를 실행합니다. PC 방화벽·동일 네트워크·설치된 Expo SDK와 클라이언트 호환성을 확인합니다. Android/iOS 기기의 쿠키 유지·화면 동작은 이번에 검증하지 않았습니다.
+주소에 /api/v1을 붙이지 않습니다. 휴대폰용으로 환경 변수를 설정한 후 npx expo start를 실행합니다. PC 방화벽·동일 네트워크·설치된 Expo SDK와 클라이언트 호환성을 확인합니다. 개별 브랜치에서는 Android 휴대폰으로 지도·탑승 흐름을 확인했습니다. 통합된 `dev`의 방 생성부터 운행·정산 완료까지의 전체 시나리오는 별도 확인이 필요합니다.
 
 ## 6. 검사 명령과 알려진 제한
 
@@ -105,15 +103,22 @@ node --test scripts/test-auth.cjs
 .\mvnw.cmd test
 ~~~
 
-상세 결과는 IMPLEMENTATION_STATUS.md를 참고합니다. 아직 비어 있는 채팅·지도·택시·P1 화면 경로에는 default export 누락 경고가 남아 있습니다. 김동민 P0 화면은 연결되어 있으나 이 경고가 전체 앱의 완성을 의미하지는 않습니다.
-
-현재 브랜치는 feature/auth-implementation이며 기존 미커밋 변경을 유지했습니다. A P0 업로드 대상은 feature/auth-implementation 브랜치입니다. main 병합은 팀원 검토 후 별도로 진행합니다.
+상세 결과는 [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)를 참고합니다. 현재 기준은 통합 `dev`입니다. 채팅 메시지 서버 저장·전송, 실제 택시 운행, 운행 후 정산 완료의 전체 흐름은 아직 검증 대상입니다.
 
 공식 참고: [Expo SDK 58](https://docs.expo.dev/versions/v58.0.0/), [Expo Router](https://docs.expo.dev/versions/v58.0.0/sdk/router/).
 
 
 ## 방장 관리 기능 업데이트 받기
 
-feature/auth-implementation 브랜치의 최신 변경을 받은 뒤 실행 중인 백엔드와 Expo를 Ctrl+C로 종료하고 위 실행 명령으로 다시 시작합니다. 필요한 패키지를 바꾸지 않았으므로 이미 설치되어 있다면 의존성을 다시 설치할 필요는 없습니다.
+최신 `dev` 변경을 받은 뒤 실행 중인 백엔드와 Expo를 Ctrl+C로 종료하고 위 실행 명령으로 다시 시작합니다. 필요한 패키지를 바꾸지 않았으므로 이미 설치되어 있다면 의존성을 다시 설치할 필요는 없습니다.
 
 방장으로 로그인 → 내 정보/내 동승방 → 방 상세 또는 동승자 관리 → 모집 인원 수정 → 2·3·4명 선택 → 저장. 삭제는 택시방 삭제 → 삭제 확인을 눌러야 적용됩니다. 취소를 누르면 방이 유지됩니다. 일반 동승자에게는 방장 관리 버튼을 표시하지 않습니다.
+
+
+## 7. 통합 dev의 지도·탑승 확인
+
+- 프로젝트 루트 `.env.local`에는 휴대폰에서 접근 가능한 `EXPO_PUBLIC_API_URL=http://PC의_LAN_IP:8080`과 `EXPO_PUBLIC_KAKAO_MAP_JS_KEY`를 설정합니다. 실제 키 값은 문서나 Git에 넣지 않습니다. `EXPO_PUBLIC_` 변수는 Expo를 재시작해야 반영됩니다.
+- `backend/.env.local`에는 로컬 MySQL 접속 설정과 `KAKAO_REST_API_KEY`를 설정하고 백엔드를 재시작합니다. `backend/.env.example`은 예시일 뿐 실제 키를 넣지 않습니다.
+- 방 생성에서 출발지·도착지를 검색하거나 지도를 움직여 좌표를 확정하고, 도로 경로선과 거리·예상 시간이 나타나는지 확인합니다. 방장 단독 모집방에서 장소 변경 후 경로가 다시 조회되는지도 확인합니다.
+- 서로 다른 계정으로 신청·승인한 뒤 채팅 화면에서 방장이 탑승 확인을 요청하고 참가자가 60초 안에 수락하는 흐름을 확인합니다. 미응답 시 자동 퇴장과 재신청 차단도 별도 방에서 확인합니다. 채팅 메시지는 현재 기기 사이에 공유되지 않습니다.
+- PC와 휴대폰은 서로 접근 가능한 네트워크여야 합니다. 휴대폰 브라우저에서 `http://PC의_LAN_IP:8080/api/v1/auth/csrf`가 열리는지 먼저 확인하면 서버 연결 문제를 구분할 수 있습니다.

@@ -81,7 +81,7 @@
 | 메서드 | 경로 | 기능 |
 |---|---|---|
 | POST | /api/v1/rooms | 방 생성(201) |
-| GET | /api/v1/rooms?destination=강남 | 모집 중이며 미래 출발인 방 최대 100개, 출발일 오름차순 |
+| GET | /api/v1/rooms?destination=강남 | 정산 완료·취소 방을 제외한 방 최대 100개, 출발 시각·방 번호 내림차순 |
 | GET | /api/v1/rooms/mine | 로그인 사용자의 방 최대 100개, 출발일·방 번호 내림차순 |
 | GET | /api/v1/rooms/{roomId} | 방 상세 |
 | GET | /api/v1/rooms/{roomId}/participations | 권한에 맞는 참여 목록 |
@@ -132,7 +132,7 @@ GET /api/v1/rooms는 기존 destination 조건에 선택 조건 origin과 period
 - origin/destination: 앞뒤 공백 제거, 대소문자 무시 부분 일치. %와 _는 일반 문자입니다.
 - period: ALL(기본), MORNING, AFTERNOON, EVENING. 잘못된 값은 INVALID_INPUT(400)입니다.
 - 한국 시간(Asia/Seoul) 기준: MORNING 00:00 이상 12:00 미만, AFTERNOON 12:00 이상 18:00 미만, EVENING 18:00 이상 24:00 미만입니다. 날짜 제한은 추가하지 않습니다.
-- 모집 상태·미래 출발·출발지·목적지·시간대 조건을 DB에서 먼저 모두 적용한 뒤, departureAt과 roomId 오름차순으로 최대 100개를 반환합니다.
+- COMPLETED·CANCELLED 상태를 제외하고 출발지·목적지·시간대 조건을 DB에서 먼저 모두 적용한 뒤, departureAt과 roomId 내림차순으로 최대 100개를 반환합니다. 출발 시각이 지난 모집방도 검색 대상입니다.
 - 화면은 모든 검색 조건을 서버에 보내며 서버 결과를 다시 잘라내지 않습니다. 디자인 preview의 샘플 데이터 필터는 별도입니다.
 
 예시: GET /api/v1/rooms?origin=수원&destination=강남&period=EVENING
@@ -145,8 +145,25 @@ GET /api/v1/rooms는 기존 destination 조건에 선택 조건 origin과 period
 - PATCH /api/v1/rooms/{roomId}/capacity, 요청 {"capacity":2}, 응답은 기존 RoomResponse입니다.
 - DELETE /api/v1/rooms/{roomId}, 성공 응답 data는 null입니다.
 - 두 요청 모두 세션·CSRF 인증과 방장 권한을 확인하고, 참여 승인과 같은 방 행 잠금을 사용합니다.
-- 정원은 방장 포함 2~4명입니다. 정원 변경은 출발 시간이 지나지 않은 RECRUITING 방에서만 가능하며 현재 확정 인원보다 줄이면 CAPACITY_BELOW_PARTICIPANTS(409)입니다. 대기 신청은 확정 인원에 포함하지 않습니다.
+- 정원은 방장 포함 2~4명입니다. 정원 변경은 출발 시간이 지나지 않은 RECRUITING 방에서만 가능하며 현재 확정 인원보다 줄이면 CAPACITY_BELOW_PARTICIPANTS(409)입니다. 현재 인원이 정원을 모두 채운 상태에서는 정원을 다시 늘리는 요청도 ROOM_FULL(409)로 거절합니다. 대기 신청은 확정 인원에 포함하지 않습니다.
 - 삭제는 RECRUITING 방에서만 허용합니다. 출발 시간이 지난 모집방도 정리할 수 있습니다. 탑승 확인·운행·정산 단계에서는 변경과 삭제를 차단합니다.
 - 삭제는 RoomStatus.CANCELLED로 표시하는 논리 삭제입니다. 활성 참여 신청은 ParticipationStatus.CANCELLED로 전환하고 방을 검색·내 동승방에서 제외합니다. 상세 및 참여 목록은 404를 반환합니다. 물리 기록과 외래 키는 보존합니다.
 - 공통 RoomStatus에 CANCELLED를 추가했습니다. 현재 MySQL 스키마의 status VARCHAR(30)은 그대로 사용하며 신규 컬럼이나 테이블은 추가하지 않습니다. 다른 환경에서 native ENUM 스키마를 따로 사용한다면 허용 상태를 검토해야 합니다.
 - 실제 요금은 정원(capacity)이 아닌 확정된 탑승 인원으로 나눕니다. 예: 정원 4명, 실제 방장+동승자 2명이면 24,000원은 1인 12,000원입니다.
+
+
+## 장소 변경·자동차 경로·탑승 확인 (2026-11-17 dev)
+
+모든 경로는 세션 인증이 필요하며 변경 요청에는 CSRF 헤더가 필요합니다.
+
+| 메서드 | 경로 | 기능 |
+|---|---|---|
+| PATCH | `/api/v1/rooms/{roomId}/locations` | 방장의 출발지·목적지 변경. 요청 `{ "origin": { "name": "수원역", "latitude": 37.2657, "longitude": 127.0007 }, "destination": { "name": "강남역", "latitude": 37.4979, "longitude": 127.0276 } }`; 응답은 RoomResponse |
+| GET | `/api/v1/routes/driving?originLatitude=37.2657&originLongitude=127.0007&destinationLatitude=37.4979&destinationLongitude=127.0276` | 자동차 도로 경로 조회. 응답 data는 `durationSeconds`, `distanceMeters`, `path[{latitude,longitude}]` |
+| POST | `/api/v1/rooms/{roomId}/boarding-checks` | 방장의 탑승 확인 요청(201) |
+| GET | `/api/v1/rooms/{roomId}/boarding-checks/current` | 현재 탑승 확인 조회 |
+| POST | `/api/v1/rooms/{roomId}/boarding-checks/{boardingCheckId}/accept` | 승인된 참가자의 탑승 수락 |
+
+- 장소 변경은 출발 전 RECRUITING 방의 방장만 가능하며, 승인된 참가자와 대기 신청자가 모두 없어야 합니다. 참가자나 대기 신청자가 있으면 `ROOM_HAS_APPLICANTS`(409)입니다.
+- 경로 조회는 서버의 `KAKAO_REST_API_KEY`로 카카오모빌리티 API를 호출합니다. 키 누락은 `ROUTE_KEY_MISSING`(503), 요청 한도 초과는 `ROUTE_QUOTA_EXCEEDED`(503), 경로 없음은 `ROUTE_NOT_FOUND`(422)로 구분합니다. 지도에서 위치를 다시 고르면 경로를 새로 조회합니다.
+- 탑승 확인은 서버 기준 60초 동안 진행합니다. 미응답 참가자는 시간 초과로 퇴장하며 같은 방에 다시 신청할 수 없습니다. 채팅 메시지는 아직 기기 간 전송·서버 저장되지 않습니다.

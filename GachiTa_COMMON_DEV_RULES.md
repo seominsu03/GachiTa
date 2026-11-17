@@ -410,7 +410,7 @@ Spring Boot Service의 메서드 역시 가능한 한 같은 의미의 이름을
 | POST | `/api/v1/rooms/{roomId}/boarding-checks` | 탑승 확인 요청 |
 | GET | `/api/v1/rooms/{roomId}/boarding-checks/current` | 현재 확인 요청 조회 |
 | POST | `/api/v1/rooms/{roomId}/boarding-checks/{boardingCheckId}/accept` | 탑승 수락 |
-| POST | `/api/v1/maps/route` | 자동차 최단 거리 조회 |
+| GET | `/api/v1/routes/driving` | 출발·도착 좌표의 자동차 도로 경로·거리·현재 기준 예상 시간 조회 |
 | GET | `/api/v1/rooms/{roomId}/taxi` | 가상 택시 상태 |
 | POST | `/api/v1/rooms/{roomId}/taxi/advance` | 가상 택시 다음 단계 |
 | POST | `/api/v1/rooms/{roomId}/settlement` | 요금 입력 및 정산 생성 |
