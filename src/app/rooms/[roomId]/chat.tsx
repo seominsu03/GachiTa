@@ -14,6 +14,7 @@ import { getRoomById } from '@/features/rooms/api';
 import { cancelParticipation, getParticipations } from '@/features/participation/api';
 import { ApiError } from '@/services/apiClient';
 import { CHAT_COLORS as colors, chatTime } from '@/features/chat/theme';
+import { getTaxiStatus } from '@/features/taxi/api';
 import type { BoardingCheck } from '@/types/boarding';
 import type { ChatMessage } from '@/types/chat';
 import type { Room } from '@/types/room';
@@ -32,6 +33,7 @@ export default function RoomChatScreen() {
   const [serverClockOffsetMs, setServerClockOffsetMs] = useState(0);
   const [boardingError, setBoardingError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
+  const [taxiAvailable, setTaxiAvailable] = useState(false);
   const actionLock = useRef(false);
   const goBack = () => router.canGoBack() ? router.back() : router.replace('/(tabs)/chats');
   const goToRoom = () => router.push({ pathname: '/rooms/[roomId]', params: { roomId: String(parsedRoomId) } });
@@ -111,6 +113,21 @@ export default function RoomChatScreen() {
     return () => { active = false; clearInterval(timer); };
   }, [parsedRoomId, activeRoomId, currentUserId, applyCheck]);
 
+  useEffect(() => {
+    if (!activeRoomId || !currentUserId) return;
+    let active = true;
+    async function refreshTaxiAvailability() {
+      try {
+        const taxi = await getTaxiStatus(parsedRoomId);
+        if (active) setTaxiAvailable(taxi.status === 'BOARDING_CHECK' || taxi.status === 'TAXI_CALLING' ||
+          taxi.status === 'TAXI_ASSIGNED' || taxi.status === 'IN_RIDE' || taxi.status === 'SETTLING' || taxi.status === 'COMPLETED');
+      } catch { if (active) setTaxiAvailable(false); }
+    }
+    void refreshTaxiAvailability();
+    const timer = setInterval(() => void refreshTaxiAvailability(), 3000);
+    return () => { active = false; clearInterval(timer); };
+  }, [activeRoomId, currentUserId, parsedRoomId]);
+
   async function runAction(action: () => Promise<void>) {
     if (actionLock.current) return;
     actionLock.current = true;
@@ -142,6 +159,7 @@ export default function RoomChatScreen() {
           <Pressable accessibilityRole="button" onPress={goToRoom} style={styles.roomLink}><Text style={styles.roomLinkText}>택시방 상세로 돌아가기 ›</Text></Pressable>
         </View>
         <Text style={styles.demoNotice}>탑승 확인은 서버에 저장됩니다. 채팅 메시지만 이 기기에서 시연됩니다.</Text>
+        {taxiAvailable && <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/rooms/[roomId]/taxi', params: { roomId: String(room.roomId) } })} style={styles.taxiButton}><Text style={styles.taxiButtonText}>가상 택시 이용 화면으로 이동 ›</Text></Pressable>}
         <FlatList
           ref={listRef} style={styles.flex} data={timeline} keyExtractor={(item) => item.kind === 'boarding' ? `boarding-${item.roomId}` : `message-${item.message.messageId}`}
           renderItem={({ item }) => item.kind === 'message' ? <MessageBubble message={item.message} currentUserId={user.userId} /> : (
@@ -187,6 +205,8 @@ const styles = StyleSheet.create({
   demoNotice: { paddingHorizontal: 20, marginBottom: 10, fontSize: 11, lineHeight: 18, color: colors.secondary },
   roomLink: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center' },
   roomLinkText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  taxiButton: { marginHorizontal: 20, marginBottom: 8, minHeight: 44, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  taxiButtonText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
   messages: { paddingHorizontal: 20, paddingBottom: 18 }, emptyMessages: { flexGrow: 1, justifyContent: 'center' },
   empty: { padding: 24, alignItems: 'center', gap: 10 }, emptyTitle: { color: colors.text, fontSize: 17, lineHeight: 26, fontWeight: '700' },
   unavailable: { flex: 1, justifyContent: 'center' },

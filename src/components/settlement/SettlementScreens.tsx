@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 import { Button, Card, Icon, Notice, Screen, ui } from '@/components/ui/DesignSystem';
 import { Avatar, MemberStrip, RoomSummary, money } from '@/components/rooms/RoomPresentation';
 import { design as c } from '@/constants/design';
@@ -14,7 +14,7 @@ export function SettlementScreen({ onRefresh, stage, room, members, settlement, 
   stage: SettlementStage; room: Room; members: Member[]; settlement: Settlement | null; userId: number; navigate: Navigate;
   onRefresh?: () => void; onCreate: (fare: number) => void; onReceipt: (userId: number) => void; busy?: boolean; error?: string | null; preview?: boolean;
 }) {
-  const [fare, setFare] = useState(preview ? '24000' : ''); const [inputError, setInputError] = useState<string | null>(null); const [showChat, setShowChat] = useState(false);
+  const [fare, setFare] = useState(preview ? '24000' : ''); const [inputError, setInputError] = useState<string | null>(null);
   const host = room.hostUserId === userId;
   const canInput = host && (preview || (room.status === 'SETTLING' && !settlement));
   const total = settlement?.totalFare ?? 0; const each = settlement?.farePerPerson ?? 0;
@@ -28,7 +28,7 @@ export function SettlementScreen({ onRefresh, stage, room, members, settlement, 
   const footer = stage === 'settlement' ? <Button disabled={!settlement && !canInput} onPress={() => navigate(settlement ? 'confirm' : 'amount', room.roomId)}>{settlement ? '정산 금액 확인' : !host ? '방장의 요금 입력을 기다리고 있어요' : canInput ? '실제 요금 입력하기' : '운행 완료 후 요금을 입력할 수 있어요'}</Button>
     : stage === 'amount' ? <Button disabled={!canInput} busy={busy} onPress={create}>정산 금액 계산</Button>
       : stage === 'confirm' ? <Button onPress={() => navigate('status', room.roomId)}>정산 현황 확인</Button>
-        : stage === 'complete' ? <><Button onPress={() => setShowChat(true)}>채팅방으로 돌아가기</Button><Button secondary onPress={() => navigate('home')}>홈으로 돌아가기</Button></>
+        : stage === 'complete' ? <><Button onPress={() => navigate('chat', room.roomId)}>채팅방으로 돌아가기</Button><Button secondary onPress={() => navigate('home')}>홈으로 돌아가기</Button></>
           : done === count && count > 0 ? <Button onPress={() => navigate('complete', room.roomId)}>전체 정산 완료 확인</Button> : undefined;
   return <Screen title={title} right={onRefresh && <Button secondary small onPress={onRefresh}>새로고침</Button>} footer={footer}>
     {stage === 'complete' && <View style={{ alignItems: 'center', gap: 14, paddingVertical: 14 }}><View style={{ backgroundColor: c.tint, padding: 10, borderRadius: 30 }}><Icon name="check" /></View><Text style={ui.heading}>모든 참여자의 정산이 완료되었어요!</Text></View>}
@@ -46,6 +46,5 @@ export function SettlementScreen({ onRefresh, stage, room, members, settlement, 
       {stage === 'status' && <Card style={{ borderWidth: 0 }}><Text style={ui.label}>{done === count ? '모든 참여자의 정산이 완료되었어요.' : `아직 ${count - done}명의 정산을 기다리고 있어요.`}</Text><Text style={[ui.muted, { fontSize: 11 }]}>{host ? '송금을 받은 뒤 ‘받았음’을 눌러 확인해 주세요.' : '앱 밖에서 방장에게 직접 송금해 주세요.'}</Text></Card>}
     </>}
     {!!settlement?.remainderFare && <Notice>원 미만 버림으로 남은 차액 {settlement.remainderFare}원이 있어요. 차액 지원은 향후 정책이며 자동 송금되지 않아요.</Notice>}
-    <Modal visible={showChat} transparent animationType="fade" onRequestClose={() => setShowChat(false)}><View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#00000055' }}><Card><Text style={ui.heading}>채팅 화면 연결</Text><Text style={ui.body}>B 담당 채팅 화면은 이번 작업에서 변경하지 않았어요.</Text><Button onPress={() => { setShowChat(false); navigate('home'); }}>홈으로 돌아가기</Button></Card></View></Modal>
   </Screen>;
 }

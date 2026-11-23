@@ -167,3 +167,14 @@ GET /api/v1/rooms는 기존 destination 조건에 선택 조건 origin과 period
 - 장소 변경은 출발 전 RECRUITING 방의 방장만 가능하며, 승인된 참가자와 대기 신청자가 모두 없어야 합니다. 참가자나 대기 신청자가 있으면 `ROOM_HAS_APPLICANTS`(409)입니다.
 - 경로 조회는 서버의 `KAKAO_REST_API_KEY`로 카카오모빌리티 API를 호출합니다. 키 누락은 `ROUTE_KEY_MISSING`(503), 요청 한도 초과는 `ROUTE_QUOTA_EXCEEDED`(503), 경로 없음은 `ROUTE_NOT_FOUND`(422)로 구분합니다. 지도에서 위치를 다시 고르면 경로를 새로 조회합니다.
 - 탑승 확인은 서버 기준 60초 동안 진행합니다. 미응답 참가자는 시간 초과로 퇴장하며 같은 방에 다시 신청할 수 없습니다. 채팅 메시지는 아직 기기 간 전송·서버 저장되지 않습니다.
+
+## 가상 택시 운행 (`feature/taxi-integration`, dev 병합 전)
+
+두 경로 모두 세션 인증이 필요하며 POST 요청에는 CSRF 헤더가 필요합니다.
+
+| 메서드 | 경로 | 기능 |
+|---|---|---|
+| GET | `/api/v1/rooms/{roomId}/taxi` | 방장 또는 탑승 확인을 마친 동승자가 현재 가상 운행 상태 조회 |
+| POST | `/api/v1/rooms/{roomId}/taxi/advance` | 방장이 `{ "expectedStatus": "BOARDING_CHECK" }`처럼 현재 단계를 보내 다음 단계 진행. `BOARDING_CHECK → TAXI_CALLING → TAXI_ASSIGNED → IN_RIDE → SETTLING` |
+
+첫 호출은 최신 탑승 확인 요청이 완료됐고 현재 참여 인원 전원이 탑승을 수락한 경우에만 허용합니다. 이후 호출은 현재 단계의 바로 다음 단계로만 진행합니다. 요청의 `expectedStatus`가 실제 방 상태와 다르면 `TAXI_STAGE_CHANGED`(409)로 거절해 중복 요청이 단계를 건너뛰지 못하게 합니다. `SETTLING`에 도달하면 기존 정산 API에서 요금을 입력할 수 있습니다. 실제 택시 호출이나 차량 위치 조회는 수행하지 않습니다.
