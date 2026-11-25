@@ -13,7 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service @Transactional
 public class RoomService {
     private final RoomRepository rooms; private final UserRepository users; private final ParticipationRepository members;
-    public RoomService(RoomRepository rooms, UserRepository users, ParticipationRepository members) { this.rooms = rooms; this.users = users; this.members = members; }
+    private final RoomCompletionRepository completions;
+    public RoomService(RoomRepository rooms, UserRepository users, ParticipationRepository members, RoomCompletionRepository completions) {
+        this.rooms = rooms; this.users = users; this.members = members; this.completions = completions;
+    }
     public RoomResponse createRoom(Long userId, RoomCreateRequest input) {
         var user = users.findById(userId).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "다시 로그인해 주세요."));
         if (input.origin().latitude() == input.destination().latitude() && input.origin().longitude() == input.destination().longitude())
@@ -40,11 +43,15 @@ public class RoomService {
         var room = rooms.findLockedById(roomId).filter(value -> value.getStatus() != RoomStatus.CANCELLED)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "ROOM_NOT_FOUND", "택시방이 없습니다."));
         if (!room.getHost().getUserId().equals(userId)) throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "방장만 변경할 수 있습니다.");
+        return room;
+    }
+    private TaxiRoom lockRecruitingHostRoom(Long roomId, Long userId) {
+        var room = lockHostRoom(roomId, userId);
         if (room.getStatus() != RoomStatus.RECRUITING) throw new ApiException(HttpStatus.CONFLICT, "ROOM_NOT_RECRUITING", "모집 중인 방만 변경하거나 삭제할 수 있습니다.");
         return room;
     }
     public RoomResponse updateRoomCapacity(Long roomId, Long userId, int capacity) {
-        var room = lockHostRoom(roomId, userId);
+        var room = lockRecruitingHostRoom(roomId, userId);
         if (!room.getDepartureAt().isAfter(Instant.now())) throw new ApiException(HttpStatus.CONFLICT, "ROOM_NOT_RECRUITING", "출발 시간이 지난 방의 정원은 변경할 수 없습니다.");
         if (capacity < 2 || capacity > 4) throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "방장 포함 2~4명을 선택해 주세요.");
         if (room.getParticipantCount() >= room.getCapacity())
@@ -54,7 +61,7 @@ public class RoomService {
         return RoomResponse.from(room);
     }
     public RoomResponse updateLocations(Long roomId, Long userId, RoomLocationsRequest input) {
-        var room = lockHostRoom(roomId, userId);
+        var room = lockRecruitingHostRoom(roomId, userId);
         if (!room.getDepartureAt().isAfter(Instant.now()))
             throw new ApiException(HttpStatus.CONFLICT, "ROOM_NOT_RECRUITING", "출발 시간이 지난 방은 장소를 변경할 수 없습니다.");
         if (room.getParticipantCount() != 1 || members.findByRoomRoomIdOrderByParticipationId(roomId).stream()
@@ -68,6 +75,12 @@ public class RoomService {
     }
     public void deleteRoom(Long roomId, Long userId) {
         var room = lockHostRoom(roomId, userId);
+        if (room.getStatus() == RoomStatus.COMPLETED) {
+            room.setStatus(RoomStatus.CANCELLED);
+            return;
+        }
+        if (room.getStatus() != RoomStatus.RECRUITING)
+            throw new ApiException(HttpStatus.CONFLICT, "ROOM_NOT_RECRUITING", "모집 중이거나 정산 완료된 방만 삭제할 수 있습니다.");
         // Logical deletion preserves foreign keys and future B-owned boarding/chat records.
         room.setStatus(RoomStatus.CANCELLED);
         for (var member : members.findByRoomRoomIdOrderByParticipationId(roomId)) {
@@ -75,5 +88,12 @@ public class RoomService {
                 member.setStatus(ParticipationStatus.CANCELLED);
         }
         room.setParticipantCount(1);
+    }
+
+    public void archiveCompletedRoom(Long roomId, Instant cutoff) {
+        var room = rooms.findLockedById(roomId).orElse(null);
+        if (room != null && room.getStatus() == RoomStatus.COMPLETED &&
+                completions.findById(roomId).filter(value -> !value.getCompletedAt().isAfter(cutoff)).isPresent())
+            room.setStatus(RoomStatus.CANCELLED);
     }
 }

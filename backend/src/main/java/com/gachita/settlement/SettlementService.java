@@ -2,6 +2,7 @@ package com.gachita.settlement;
 import com.gachita.common.ApiException;
 import com.gachita.participation.*;
 import com.gachita.room.*;
+import java.time.Instant;
 import java.util.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -10,9 +11,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service @Transactional
 public class SettlementService {
     private final RoomRepository rooms; private final ParticipationRepository members; private final SettlementRepository settlements;
-    public SettlementService(RoomRepository rooms, ParticipationRepository members, SettlementRepository settlements) { this.rooms = rooms; this.members = members; this.settlements = settlements; }
+    private final RoomCompletionRepository completions;
+    public SettlementService(RoomRepository rooms, ParticipationRepository members, SettlementRepository settlements, RoomCompletionRepository completions) {
+        this.rooms = rooms; this.members = members; this.settlements = settlements; this.completions = completions;
+    }
     private ApiException error(HttpStatus status, String code, String message) { return new ApiException(status, code, message); }
-    private TaxiRoom findRoom(Long roomId, boolean lock) { return (lock ? rooms.findLockedById(roomId) : rooms.findById(roomId)).orElseThrow(() -> error(HttpStatus.NOT_FOUND, "ROOM_NOT_FOUND", "택시방이 없습니다.")); }
+    private TaxiRoom findRoom(Long roomId, boolean lock) { return (lock ? rooms.findLockedById(roomId) : rooms.findById(roomId))
+            .filter(room -> room.getStatus() != RoomStatus.CANCELLED)
+            .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "ROOM_NOT_FOUND", "택시방이 없습니다.")); }
     private void requireHost(TaxiRoom room, Long userId) { if (!room.getHost().getUserId().equals(userId)) throw error(HttpStatus.FORBIDDEN, "FORBIDDEN", "방장만 정산을 처리할 수 있습니다."); }
     private void requireMember(TaxiRoom room, Long userId) {
         if (room.getHost().getUserId().equals(userId)) return;
@@ -29,7 +35,10 @@ public class SettlementService {
         var settlement = new Settlement(room, totalFare, count);
         settlement.getReceipts().add(new SettlementParticipant(settlement, room.getHost(), true));
         approved.forEach(member -> settlement.getReceipts().add(new SettlementParticipant(settlement, member.getUser(), false)));
-        if (count == 1) room.setStatus(RoomStatus.COMPLETED);
+        if (count == 1) {
+            room.setStatus(RoomStatus.COMPLETED);
+            completions.save(new RoomCompletion(room, Instant.now()));
+        }
         return SettlementResponse.from(settlements.saveAndFlush(settlement));
     }
     @Transactional(readOnly = true) public SettlementResponse getSettlement(Long roomId, Long userId) {
@@ -41,7 +50,10 @@ public class SettlementService {
         var settlement = settlements.findByRoomRoomId(roomId).orElseThrow(() -> error(HttpStatus.NOT_FOUND, "SETTLEMENT_NOT_FOUND", "정산 정보가 없습니다."));
         var receipt = settlement.getReceipts().stream().filter(value -> value.getUser().getUserId().equals(userId)).findFirst().orElseThrow(() -> error(HttpStatus.NOT_FOUND, "RECEIPT_NOT_FOUND", "정산 참여자가 없습니다."));
         receipt.confirm();
-        if (settlement.getReceipts().stream().allMatch(SettlementParticipant::isReceived)) room.setStatus(RoomStatus.COMPLETED);
+        if (room.getStatus() != RoomStatus.COMPLETED && settlement.getReceipts().stream().allMatch(SettlementParticipant::isReceived)) {
+            room.setStatus(RoomStatus.COMPLETED);
+            completions.save(new RoomCompletion(room, Instant.now()));
+        }
         return SettlementResponse.from(settlement);
     }
 }

@@ -30,6 +30,7 @@ class RideFlowIntegrationTest {
     @Autowired RoomService roomService; @Autowired RoomRepository rooms;
     @Autowired ParticipationService participation; @Autowired ParticipationRepository members;
     @Autowired SettlementRepository settlements; @Autowired UserRepository users;
+    @Autowired RoomCompletionRepository completions; @Autowired CompletedRoomRetentionService retention;
     User host; User first; User second;
     @BeforeEach void setup() {
         cleanup();
@@ -37,7 +38,7 @@ class RideFlowIntegrationTest {
         first = users.save(new User("first", "하루", "unused-test-hash"));
         second = users.save(new User("second", "민트", "unused-test-hash"));
     }
-    @AfterEach void cleanup() { settlements.deleteAll(); members.deleteAll(); rooms.deleteAll(); users.deleteAll(); }
+    @AfterEach void cleanup() { completions.deleteAll(); settlements.deleteAll(); members.deleteAll(); rooms.deleteAll(); users.deleteAll(); }
     RoomCreateRequest input(int capacity) { return new RoomCreateRequest(new LocationInfo("수원역", 37.2657, 127.0007), new LocationInfo("강남역", 37.4979, 127.0276), Instant.now().plusSeconds(86400), capacity); }
     RoomResponse create(int capacity) { return roomService.createRoom(host.getUserId(), input(capacity)); }
     String as(User user) { return user.getUserId().toString(); }
@@ -95,6 +96,7 @@ class RideFlowIntegrationTest {
         for (var user : List.of(first, second)) mvc.perform(patch(path + "/receipts/" + user.getUserId()).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"received\":true}"))
                 .andExpect(status().isOk());
         assertThat(roomService.getRoomById(room.roomId()).status()).isEqualTo(RoomStatus.COMPLETED);
+        assertThat(completions.findById(room.roomId())).isPresent();
         mvc.perform(get(path).with(user(as(second)))).andExpect(status().isOk()).andExpect(jsonPath("$.data.receipts[2].received").value(true));
     }
 
@@ -200,6 +202,9 @@ class RideFlowIntegrationTest {
         mvc.perform(patch(path + "/receipts/" + second.getUserId()).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"received\":true}"))
                 .andExpect(status().isOk());
         assertThat(roomService.getRoomById(room.roomId()).status()).isEqualTo(RoomStatus.COMPLETED);
+        mvc.perform(patch(path + "/receipts/" + second.getUserId()).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"received\":true}"))
+                .andExpect(status().isOk());
+        assertThat(completions.findById(room.roomId())).isPresent();
     }
 
     @Test void cannotCancelAnotherUsersRequestOrApproveItInAnotherRoom() throws Exception {
@@ -324,7 +329,7 @@ class RideFlowIntegrationTest {
     }
 
     @Test void boardingRideAndSettlementRoomsCannotBeEditedOrDeleted() throws Exception {
-        for (var stage : List.of(RoomStatus.BOARDING_CHECK, RoomStatus.TAXI_CALLING, RoomStatus.TAXI_ASSIGNED, RoomStatus.IN_RIDE, RoomStatus.SETTLING, RoomStatus.COMPLETED)) {
+        for (var stage : List.of(RoomStatus.BOARDING_CHECK, RoomStatus.TAXI_CALLING, RoomStatus.TAXI_ASSIGNED, RoomStatus.IN_RIDE, RoomStatus.SETTLING)) {
             var room = create(4);
             var entity = rooms.findById(room.roomId()).orElseThrow(); entity.setStatus(stage); rooms.saveAndFlush(entity);
             String path = "/api/v1/rooms/" + room.roomId();
@@ -333,6 +338,51 @@ class RideFlowIntegrationTest {
             mvc.perform(delete(path).with(user(as(host))).with(csrf())).andExpect(status().isConflict());
             assertThat(rooms.findById(room.roomId()).orElseThrow().getStatus()).isEqualTo(stage);
         }
+    }
+
+    @Test void onlyHostCanDeleteCompletedRoomAndSettlementRecordRemains() throws Exception {
+        var room = create(2);
+        var entity = rooms.findById(room.roomId()).orElseThrow();
+        entity.setStatus(RoomStatus.COMPLETED); rooms.saveAndFlush(entity);
+        completions.saveAndFlush(new RoomCompletion(entity, Instant.now()));
+        String path = "/api/v1/rooms/" + room.roomId();
+        mvc.perform(delete(path).with(user(as(first))).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(delete(path).with(user(as(host))).with(csrf())).andExpect(status().isOk());
+        assertThat(rooms.findById(room.roomId()).orElseThrow().getStatus()).isEqualTo(RoomStatus.CANCELLED);
+        assertThat(completions.findById(room.roomId())).isPresent();
+        mvc.perform(get(path).with(user(as(host)))).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/rooms/mine").with(user(as(host)))).andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test void completedRoomsExpireSevenDaysAfterCompletionOnly() {
+        var now = Instant.now();
+        var overdue = create(2);
+        var recent = create(2);
+        var recruiting = create(2);
+        for (var room : List.of(overdue, recent)) {
+            var entity = rooms.findById(room.roomId()).orElseThrow();
+            entity.setStatus(RoomStatus.COMPLETED); rooms.saveAndFlush(entity);
+        }
+        completions.saveAndFlush(new RoomCompletion(rooms.findById(overdue.roomId()).orElseThrow(), now.minusSeconds(7 * 86400L)));
+        completions.saveAndFlush(new RoomCompletion(rooms.findById(recent.roomId()).orElseThrow(), now.minusSeconds(7 * 86400L - 1)));
+        retention.archiveDue(now.minusSeconds(1));
+        assertThat(rooms.findById(overdue.roomId()).orElseThrow().getStatus()).isEqualTo(RoomStatus.COMPLETED);
+        retention.archiveDue(now);
+        assertThat(rooms.findById(overdue.roomId()).orElseThrow().getStatus()).isEqualTo(RoomStatus.CANCELLED);
+        assertThat(rooms.findById(recent.roomId()).orElseThrow().getStatus()).isEqualTo(RoomStatus.COMPLETED);
+        assertThat(rooms.findById(recruiting.roomId()).orElseThrow().getStatus()).isEqualTo(RoomStatus.RECRUITING);
+    }
+
+    @Test void existingCompletedRoomStartsRetentionWhenFirstSeen() {
+        var room = create(2);
+        var entity = rooms.findById(room.roomId()).orElseThrow();
+        entity.setStatus(RoomStatus.COMPLETED); rooms.saveAndFlush(entity);
+        var firstRun = Instant.now();
+        retention.archiveDue(firstRun);
+        assertThat(rooms.findById(room.roomId()).orElseThrow().getStatus()).isEqualTo(RoomStatus.COMPLETED);
+        assertThat(completions.findById(room.roomId()).orElseThrow().getCompletedAt()).isEqualTo(firstRun.truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+        retention.archiveDue(firstRun.plusSeconds(7 * 86400L));
+        assertThat(rooms.findById(room.roomId()).orElseThrow().getStatus()).isEqualTo(RoomStatus.CANCELLED);
     }
 
     @Test void settlementUsesActualRidersEvenWhenCapacityIsFour() throws Exception {
