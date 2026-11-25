@@ -2,13 +2,15 @@ import { useRef, useState } from 'react';
 import { Link, useLocalSearchParams, router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
+import { SignupForm } from '@/components/auth/SignupForm';
+
 import { ROUTES } from '@/constants/routes';
 import { design as c } from '@/constants/design';
 import { useAuth } from '@/contexts/AuthContext';
 import { validateLogin, validateSignup } from '@/features/auth/validation';
 import { Brand, Button, Field, Icon, Notice, Screen, ui } from '@/components/ui/DesignSystem';
 
-export function AuthForm({ mode, preview = false, onNavigate }: { mode: 'login' | 'signup'; preview?: boolean; onNavigate?: (screen: string) => void }) {
+function LegacyAuthForm({ mode, preview = false, onNavigate }: { mode: 'login' | 'signup'; preview?: boolean; onNavigate?: (screen: string) => void }) {
   const isSignup = mode === 'signup';
   const auth = useAuth();
   const { registered } = useLocalSearchParams<{ registered?: string }>();
@@ -67,4 +69,8 @@ export function AuthForm({ mode, preview = false, onNavigate }: { mode: 'login' 
     {!isSignup && <View style={[ui.row, { justifyContent: 'center', gap: 16, paddingTop: 4 }]}><Text accessibilityState={{ disabled: true }} style={ui.muted}>아이디 찾기</Text><Text style={{ color: c.line }}>|</Text><Text accessibilityState={{ disabled: true }} style={ui.muted}>비밀번호 찾기</Text></View>}
     {isSignup && switchAccount}
   </Screen>;
+}
+
+export function AuthForm(props: { mode: 'login' | 'signup'; preview?: boolean; onNavigate?: (screen: string) => void }) {
+  return props.mode === 'signup' ? <SignupForm preview={props.preview} onNavigate={props.onNavigate} /> : <LegacyAuthForm {...props} />;
 }

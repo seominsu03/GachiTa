@@ -132,3 +132,17 @@ test('host room changes use PATCH and DELETE through the shared CSRF client', as
   assert.equal(calls[2].options.method, 'DELETE');
   assert.equal(calls[2].options.headers['X-CSRF-TOKEN'], 'token');
 });
+
+test('signup wizard validates each step without requiring later fields', () => {
+  const { load } = loadAuthModules();
+  const { signupSteps, validateSignupStep } = load('features/auth/signupSteps');
+  const { validateSignup } = load('features/auth/validation');
+  const values = { username: 'rider_01', password: 'Password123!', passwordConfirm: 'Password123!', name: '테스트', nickname: '동승자', phoneNumber: '010-1234-5678' };
+  for (const step of signupSteps) {
+    assert.equal(validateSignupStep(step.key, values), null);
+    assert.equal(typeof validateSignupStep(step.key, { ...values, [step.key]: '' }), 'string');
+  }
+  assert.equal(validateSignupStep('username', { ...values, password: '', name: '', phoneNumber: '' }), null);
+  assert.equal(typeof validateSignupStep('passwordConfirm', { ...values, password: 'Changed123!' }), 'string');
+  assert.equal(validateSignup(values, values.passwordConfirm), null);
+});
