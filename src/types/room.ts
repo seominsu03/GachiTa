@@ -10,4 +10,4 @@ export type RoomCreateRequest = { origin: LocationInfo; destination: LocationInf
 export type Participation = Member & { participationId: number; roomId: number; status: ParticipationStatus };
 
 export type DeparturePeriod = 'ALL' | 'MORNING' | 'AFTERNOON' | 'EVENING';
-export type RoomSearchParams = { origin?: string; destination?: string; period?: DeparturePeriod };
+export type RoomSearchParams = { origin?: string; destination?: string; period?: DeparturePeriod; latitude?: number; longitude?: number; radiusMeters?: number; nearTarget?: string; metro?: boolean };

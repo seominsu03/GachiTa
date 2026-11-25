@@ -11,8 +11,8 @@ export function toDeparturePeriod(label = '전체'): DeparturePeriod {
 }
 export function roomSearchQuery(input: string | RoomSearchParams = '') {
   const params = typeof input === 'string' ? { destination: input } : input;
-  const values = { destination: params.destination?.trim(), origin: params.origin?.trim(), period: params.period };
-  const query = Object.entries(values).filter(([, value]) => value && value !== 'ALL')
-    .map(([key, value]) => encodeURIComponent(key) + '=' + encodeURIComponent(value!)).join('&');
+  const values = { destination: params.destination?.trim(), origin: params.origin?.trim(), period: params.period, latitude: params.latitude, longitude: params.longitude, radiusMeters: params.radiusMeters, nearTarget: params.nearTarget, metro: params.metro };
+  const query = Object.entries(values).filter(([, value]) => value !== undefined && value !== '' && value !== 'ALL')
+    .map(([key, value]) => encodeURIComponent(key) + '=' + encodeURIComponent(String(value))).join('&');
   return query ? '?' + query : '';
 }

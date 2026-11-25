@@ -1,4 +1,4 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, Icon, ui } from '@/components/ui/DesignSystem';
 import { design as c } from '@/constants/design';
 import type { Member, Room } from '@/types/room';
@@ -45,8 +45,8 @@ export function CapacityCard({ room, management = false }: { room: Room; managem
   </Card>;
 }
 
-export function MemberRow({ member, badge, children, dense = false }: { member: Member; badge?: string; children?: React.ReactNode; dense?: boolean }) {
-  return <Card style={{ paddingVertical: dense ? 7 : 10 }}><View style={ui.row}><Avatar member={member} /><View style={{ flex: 1, gap: 4 }}><View style={ui.row}><Text style={ui.bold}>{member.nickname}</Text>{badge && <Text style={ui.badge}>{badge}</Text>}</View>
+export function MemberRow({ member, badge, children, dense = false, onProfile }: { member: Member; badge?: string; children?: React.ReactNode; dense?: boolean; onProfile?: () => void }) {
+  return <Card style={{ paddingVertical: dense ? 7 : 10 }}><View style={ui.row}><Pressable accessibilityRole="button" accessibilityLabel={member.nickname + ' 프로필 보기'} disabled={!onProfile} onPress={onProfile}><Avatar member={member} /></Pressable><View style={{ flex: 1, gap: 4 }}><View style={ui.row}><Text style={ui.bold}>{member.nickname}</Text>{badge && <Text style={ui.badge}>{badge}</Text>}</View>
     {member.rating !== undefined && <View style={[ui.row, { gap: 5 }]}><Icon name="star" size={13} /><Text style={ui.label}>{member.rating.toFixed(1)}</Text><Text style={ui.muted}>· 후기 {member.reviewCount ?? 0}개</Text></View>}
   </View>{children}</View></Card>;
 }

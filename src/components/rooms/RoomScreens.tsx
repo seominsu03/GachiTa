@@ -1,3 +1,5 @@
+import { ApplicantProfile } from './ApplicantProfile';
+import { NearbySearch } from './NearbySearch';
 import { useEffect, useState } from 'react';
 import { HostRoomControls } from './HostRoomControls';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
@@ -46,8 +48,8 @@ export function RoomListScreen({ rooms, navigate, onSearch, home = false, error,
   const inProgress = newestFirst(visible.filter(room => room.status !== 'RECRUITING'));
   const past = newestFirst(visible.filter(room => room.status === 'RECRUITING' && new Date(room.departureAt).getTime() <= now));
   const homeRooms = onSearch ? recruiting.slice(0, 3) : visible;
-  const search = () => { const next = { origin: origin.trim(), destination: destination.trim(), period }; setFilter(next); if (!home) onSearch?.(next); };
-  const clearSearch = () => { setOrigin(''); setDestination(''); setPeriod('전체'); setFilter({ origin: '', destination: '', period: '전체' }); onSearch?.({ origin: '', destination: '', period: '전체' }); refresh?.(); };
+  const search = () => { const next = { origin: origin.trim(), destination: destination.trim(), period, latitude: '', longitude: '', radiusMeters: '', nearTarget: '', nearLabel: '', metro: 'true' }; setFilter(next); if (!home) onSearch?.(next); };
+  const clearSearch = () => { setOrigin(''); setDestination(''); setPeriod('전체'); setFilter({ origin: '', destination: '', period: '전체' }); onSearch?.({ origin: '', destination: '', period: '전체', latitude: '', longitude: '', radiusMeters: '', nearTarget: '', nearLabel: '', metro: 'true' }); refresh?.(); };
   const hasActiveFilter = Boolean(initialSearch.origin || initialSearch.destination || (initialSearch.period && initialSearch.period !== '전체'));
   return <Screen title={home ? undefined : '택시방 찾기'} right={!home ? <Pressable accessibilityLabel="검색 필터" onPress={() => setShowFilter(true)}><Icon name="tune" color={c.ink} /></Pressable> : undefined} tabs={<BottomNavigation active={home ? 'home' : 'rooms'} navigate={navigate} />}>
     {home && <><View style={ui.between}><Brand /><Pressable accessibilityLabel="내 정보" onPress={() => navigate('mypage')}><Icon name="user" color={c.muted} /></Pressable></View><View style={{ marginTop: 4, gap: 4 }}><Text style={ui.muted}>안녕하세요!</Text><Text style={ui.title}>어디로 같이 갈까요?</Text></View></>}
@@ -57,6 +59,7 @@ export function RoomListScreen({ rooms, navigate, onSearch, home = false, error,
     </View>
     {!home && hasActiveFilter && <View style={[ui.between, { alignItems: 'flex-start', gap: 8 }]}><Text style={[ui.muted, { flex: 1, minWidth: 0 }]}>검색 조건: {initialSearch.origin || '전체 출발지'} → {initialSearch.destination || '전체 목적지'} · {initialSearch.period || '전체 시간'}</Text><Button secondary small onPress={clearSearch}>조건 지우기</Button></View>}
     {home && <View style={ui.row}>{['택시방 만들기', '택시방 찾기'].map((label, index) => <Pressable key={label} accessibilityRole="button" onPress={() => navigate(index === 0 ? 'create' : 'rooms')} style={{ flex: 1, minHeight: 56, backgroundColor: c.tint, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 }}><Icon name={index === 0 ? 'plus' : 'people'} size={20} /><Text style={[ui.label, ui.blue]}>{label}</Text></Pressable>)}</View>}
+    <NearbySearch origin={origin} destination={destination} period={period} applied={initialSearch} onApply={next => home ? navigate('rooms', undefined, next) : onSearch?.(next)} />
     <View style={[ui.between, { marginTop: 4 }]}><Text style={ui.heading}>{home ? '모집 중인 택시방' : '택시방'}{!home && <Text style={ui.blue}> {visible.length}</Text>}</Text><View style={ui.row}>{refresh && <Button secondary small busy={loading} onPress={refresh}>새로고침</Button>}{home && <Pressable onPress={() => navigate('rooms')}><Text style={ui.muted}>더보기 ›</Text></Pressable>}</View></View>
     {error && <View style={ui.column}><Notice error>{error}</Notice><Button secondary small onPress={() => refresh?.()}>다시 불러오기</Button></View>}
     {loading && <Notice>택시방을 불러오고 있어요.</Notice>}
@@ -98,16 +101,18 @@ export function RoomDetailScreen({ onUpdateCapacity, onDeleteRoom, onEditLocatio
 
 export function ParticipantsScreen({ onUpdateCapacity, onDeleteRoom, onEditLocations, onRefresh, room, participations, navigate, busy, error, onApprove, onReject }: { room: Room; participations: Participation[]; navigate: Navigate; busy?: boolean; error?: string | null; onRefresh?: () => void; onUpdateCapacity?: (capacity: number) => Promise<void>; onDeleteRoom?: () => Promise<void>; onEditLocations?: () => void; onApprove: (id: number) => void; onReject: (id: number) => void }) {
   const now = useCurrentTime();
+  const [profile, setProfile] = useState<Participation | null>(null);
   const pending = participations.filter(p => p.status === 'PENDING'); const approved = participations.filter(p => p.status === 'APPROVED' || p.status === 'BOARDING_CONFIRMED');
   return <Screen title="동승자 관리" right={onRefresh && <Button secondary small onPress={onRefresh}>새로고침</Button>} contentGap={12} footer={<Button onPress={() => navigate('chat', room.roomId)}>채팅방으로 이동</Button>}>
+    {profile && <ApplicantProfile roomId={room.roomId} userId={profile.userId} nickname={profile.nickname} onClose={() => setProfile(null)} />}
     <RoomSummary room={room} /><CapacityCard room={room} management />
     {onUpdateCapacity && onDeleteRoom && <HostRoomControls room={room} busy={busy} onUpdate={onUpdateCapacity} onEditLocations={onEditLocations} onDelete={onDeleteRoom} canEditLocations={room.status === 'RECRUITING' && new Date(room.departureAt).getTime() > now && room.participantCount === 1 && !participations.some(p => p.status === 'PENDING' || p.status === 'APPROVED' || p.status === 'BOARDING_CONFIRMED')} />}
     <View style={ui.between}><Text style={ui.heading}>동승 신청자</Text><Text style={[ui.muted, ui.blue]}>{pending.length}명</Text></View>
     {error && <Notice error>{error}</Notice>}
-    <View style={{ gap: 8 }}>{pending.map(member => <MemberRow key={member.participationId} member={member} dense><View style={{ gap: 4 }}><Button small busy={busy} disabled={room.status !== 'RECRUITING' || room.participantCount >= room.capacity} onPress={() => onApprove(member.participationId)}>수락</Button><Button small secondary disabled={busy || room.status !== 'RECRUITING'} onPress={() => onReject(member.participationId)}>거절</Button></View></MemberRow>)}</View>
+    <View style={{ gap: 8 }}>{pending.map(member => <MemberRow key={member.participationId} member={member} dense onProfile={() => setProfile(member)}><View style={{ gap: 4 }}><Button small busy={busy} disabled={room.status !== 'RECRUITING' || room.participantCount >= room.capacity} onPress={() => onApprove(member.participationId)}>수락</Button><Button small secondary disabled={busy || room.status !== 'RECRUITING'} onPress={() => onReject(member.participationId)}>거절</Button></View></MemberRow>)}</View>
     {pending.length === 0 && <Card style={{ alignItems: 'center', paddingVertical: 22 }}><Text style={ui.body}>대기 중인 신청자가 없어요.</Text><Text style={ui.muted}>{room.participantCount >= room.capacity ? '모든 동승자가 확정되었어요.' : '새로운 동승 신청을 기다리고 있어요.'}</Text></Card>}
     <View style={ui.between}><Text style={ui.heading}>현재 동승자</Text><Text style={ui.muted}>{approved.length}명 참여 중</Text></View><Text style={[ui.muted, { fontSize: 11, marginTop: -12 }]}>방장 본인({room.host.nickname})은 목록에서 제외돼요.</Text>
-    <View style={{ gap: 8 }}>{approved.map(member => <MemberRow key={member.userId} member={member}><Text style={ui.badge}>동승 확정</Text></MemberRow>)}</View>
+    <View style={{ gap: 8 }}>{approved.map(member => <MemberRow key={member.userId} member={member} onProfile={() => setProfile(member)}><Text style={ui.badge}>동승 확정</Text></MemberRow>)}</View>
   </Screen>;
 }
 

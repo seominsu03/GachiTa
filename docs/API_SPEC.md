@@ -178,3 +178,13 @@ GET /api/v1/rooms는 기존 destination 조건에 선택 조건 origin과 period
 | POST | `/api/v1/rooms/{roomId}/taxi/advance` | 방장이 `{ "expectedStatus": "BOARDING_CHECK" }`처럼 현재 단계를 보내 다음 단계 진행. `BOARDING_CHECK → TAXI_CALLING → TAXI_ASSIGNED → IN_RIDE → SETTLING` |
 
 첫 호출은 최신 탑승 확인 요청이 완료됐고 현재 참여 인원 전원이 탑승을 수락한 경우에만 허용합니다. 이후 호출은 현재 단계의 바로 다음 단계로만 진행합니다. 요청의 `expectedStatus`가 실제 방 상태와 다르면 `TAXI_STAGE_CHANGED`(409)로 거절해 중복 요청이 단계를 건너뛰지 못하게 합니다. `SETTLING`에 도달하면 기존 정산 API에서 요금을 입력할 수 있습니다. 실제 택시 호출이나 차량 위치 조회는 수행하지 않습니다.
+
+
+## 2026-11-25 신청자 요약·거리 검색 추가
+
+- GET /api/v1/rooms/{roomId}/applicants/{userId}/profile: 해당 방장만 현재 대기/확정 신청자의 요약 조회 가능. averageRating(null=평가 없음), reviewCount, rideCount(정산 완료 횟수), reviews[{rating,comment}] 반환. 후기 최대 최근 100개, 평균·개수는 전체 기준. 회원 아이디·전화번호·다른 방 ID·이동 경로·후기 작성자 ID는 반환하지 않음.
+- GET /api/v1/rooms: 기존 origin/destination/period와 호환. latitude, longitude, radiusMeters(100/300/500/1000), nearTarget(origin/destination) 추가. 세 좌표·반경 필드는 함께 제공해야 하며 잘못된 값은 400. 직선거리(지구 반지름 6,371km)와 텍스트·시간 조건 모두 적용 후 최대 100개 반환. 반경 검색 대상의 장소명은 프런트에서 비워 주변의 다른 이름도 포함함. 반대편 텍스트 조건은 유지.
+- metro=true: 서울·경기권 검색을 위한 위도 36.85~38.30, 경도 126.35~127.90 범위를 출발지·목적지 모두에 적용. 이 범위는 행정구역 경계 폴리곤이 아니므로 일부 인접 지역이 포함될 수 있음. 기존 클라이언트의 생략 기본값은 false, 앱 목록은 true로 요청함.
+- GET /api/v1/search-places?query=장소명: 카카오 Local API 결과 중 주소가 서울 또는 경기인 장소만 반환. [{name,address,latitude,longitude}]. 2~100자. 현재 서버의 KAKAO_REST_API_KEY 재사용. 키 미설정은 503 PLACE_KEY_MISSING, 공급자 오류는 502 PLACE_PROVIDER_ERROR.
+- GET /api/v1/search-places/region?latitude=...&longitude=...: 카카오 행정구역 조회로 서울/경기도 여부 확인. GPS 기준점 지역 확인에 사용. 서버가 실제 GPS 사용 여부를 보장하는 인증 API는 아님.
+- GPS는 검색 버튼을 눌렀을 때 전경 위치만 요청. 거절·시간 초과 시 장소명 검색 안내. GPS 좌표는 검색 파라미터로만 사용하며 프로필·DB에 저장하지 않음.

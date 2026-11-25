@@ -1,6 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ChatPage } from '@/components/chat/ChatPage';
 import { MessageBubble } from '@/components/chat/MessageBubble';
@@ -32,6 +32,8 @@ export default function RoomChatScreen() {
   const listDimensionsRef = useRef({ contentHeight: 0, viewportHeight: 0 });
   const [check, setCheck] = useState<BoardingCheck | null>(null);
   const [serverClockOffsetMs, setServerClockOffsetMs] = useState(0);
+  const [timeoutWarning, setTimeoutWarning] = useState(false);
+  const warnedTimeout = useRef('');
   const [boardingError, setBoardingError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [taxiAvailable, setTaxiAvailable] = useState(false);
@@ -48,7 +50,7 @@ export default function RoomChatScreen() {
       if (!active) return;
       const allowed = found.hostUserId === user.userId || participants.some(person => person.userId === user.userId &&
         (person.status === 'APPROVED' || person.status === 'BOARDING_CONFIRMED'));
-      if (!allowed) throw new Error('승인된 참여자만 채팅방을 열 수 있습니다.');
+      if (!allowed) throw new Error(participants.some(person => person.userId === user.userId && person.status === 'TIMED_OUT') ? '탑승 확인 시간이 지나 이 방에서 퇴장했습니다.' : '승인된 참여자만 채팅방을 열 수 있습니다.');
       const mine = participants.find(person => person.userId === user.userId);
       setResult({ roomId: parsedRoomId, room: found, participationId: mine?.participationId ?? null, error: null });
     }).catch(cause => {
@@ -61,6 +63,10 @@ export default function RoomChatScreen() {
   const currentResult = result?.roomId === parsedRoomId ? result : null;
   const loading = !invalidRoomId && !currentResult;
   const loadError = invalidRoomId ? '올바른 채팅방 주소가 아닙니다.' : currentResult?.error;
+  useEffect(() => {
+    const key=String(parsedRoomId)+':'+String(user?.userId);
+    if(loadError?.includes('탑승 확인 시간이 지나') && warnedTimeout.current!==key){warnedTimeout.current=key;setTimeoutWarning(true);}
+  },[loadError,parsedRoomId,user?.userId]);
   const room = currentResult?.room;
   const activeRoomId = room?.roomId;
   const currentUserId = user?.userId;
@@ -194,7 +200,9 @@ export default function RoomChatScreen() {
   }
 
   if (!room || !user) {
-    return <ChatPage title="택시방 채팅" onBack={goBack}><View style={[styles.empty, styles.unavailable]}><Text style={styles.emptyTitle}>{loading ? '채팅방 불러오는 중' : '채팅방을 열 수 없어요'}</Text><Text style={styles.description}>{loadError}</Text>{!invalidRoomId && <Pressable accessibilityRole="button" onPress={goToRoom} style={styles.returnButton}><Text style={styles.returnText}>택시방 상세로</Text></Pressable>}<Pressable accessibilityRole="button" onPress={() => router.replace('/(tabs)/chats')} style={styles.returnButton}><Text style={styles.returnText}>채팅 목록으로</Text></Pressable></View></ChatPage>;
+    return <ChatPage title="택시방 채팅" onBack={goBack}>
+      <Modal visible={timeoutWarning} transparent animationType="fade" onRequestClose={()=>setTimeoutWarning(false)}><View style={{flex:1,justifyContent:'center',padding:24,backgroundColor:'#00000066'}}><View style={{backgroundColor:'#fff',borderRadius:16,padding:24,gap:16}}><Text accessibilityRole="alert" style={{fontSize:20,fontWeight:'700'}}>탑승 확인 시간 초과</Text><Text>1분 동안 응답하지 않아 방에서 자동 퇴장했습니다. 같은 방에는 다시 참여할 수 없습니다.</Text><Pressable accessibilityRole="button" onPress={()=>setTimeoutWarning(false)} style={{padding:14}}><Text>확인</Text></Pressable></View></View></Modal>
+      <View style={[styles.empty, styles.unavailable]}><Text style={styles.emptyTitle}>{loading ? '채팅방 불러오는 중' : '채팅방을 열 수 없어요'}</Text><Text style={styles.description}>{loadError}</Text>{!invalidRoomId && <Pressable accessibilityRole="button" onPress={goToRoom} style={styles.returnButton}><Text style={styles.returnText}>택시방 상세로</Text></Pressable>}<Pressable accessibilityRole="button" onPress={() => router.replace('/(tabs)/chats')} style={styles.returnButton}><Text style={styles.returnText}>채팅 목록으로</Text></Pressable></View></ChatPage>;
   }
 
   const messagesLoaded = messageSnapshot?.roomId === room.roomId;

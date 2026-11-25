@@ -152,3 +152,11 @@ test('departure time accepts arbitrary minutes and rejects invalid clock values'
   for (const [input, expected] of [['14:37','14:37'],['9:07','09:07'],['1437','14:37'],['00:00','00:00'],['23:59','23:59']]) assert.equal(normalizeDepartureTime(input), expected);
   for (const input of ['', '24:00', '12:60', '12:3', '-1:00', '12:30:00', 'abcd']) assert.equal(normalizeDepartureTime(input), null);
 });
+
+test('nearby search preserves exact coordinates, radius, target and regional scope', () => {
+ const { roomSearchQuery }=loadAuthModules().load('features/rooms/search');
+ for(const radiusMeters of [100,300,500,1000]){
+ const result=roomSearchQuery({latitude:37.5,longitude:127,radiusMeters,nearTarget:'destination',metro:true});
+ assert.ok(result.includes('latitude=37.5'));assert.ok(result.includes('longitude=127'));assert.ok(result.includes('radiusMeters='+radiusMeters));assert.ok(result.includes('nearTarget=destination'));assert.ok(result.includes('metro=true'));
+ }
+});

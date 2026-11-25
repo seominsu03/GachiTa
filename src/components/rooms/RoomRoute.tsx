@@ -30,10 +30,11 @@ export const navigateRoom: Navigate = (screen, roomId, search) => {
 };
 
 export function RoomsRoute({ home = false }: { home?: boolean }) {
-  const params = useLocalSearchParams<{ origin?: string; destination?: string; period?: string }>();
+  const params = useLocalSearchParams<{ origin?: string; destination?: string; period?: string; latitude?: string; longitude?: string; radiusMeters?: string; nearTarget?: string; nearLabel?: string; metro?: string }>();
   const destination = params.destination ?? ''; const origin = params.origin ?? ''; const period = params.period ?? '전체';
+  const { latitude, longitude, radiusMeters, nearTarget } = params;
   const { user } = useAuth(); const userId = user?.userId;
-  const load = useCallback(() => userId ? rooms.getRooms({ origin, destination, period: toDeparturePeriod(period) }) : Promise.resolve([]), [origin, destination, period, userId]); const remote = useRemote(load);
+  const load = useCallback(() => userId ? rooms.getRooms({ origin, destination, period: toDeparturePeriod(period), latitude: latitude ? Number(latitude) : undefined, longitude: longitude ? Number(longitude) : undefined, radiusMeters: radiusMeters ? Number(radiusMeters) : undefined, nearTarget: nearTarget || undefined, metro: true }) : Promise.resolve([]), [origin, destination, period, userId, latitude, longitude, radiusMeters, nearTarget]); const remote = useRemote(load);
   return <RoomListScreen key={`${params.origin ?? ''}-${destination}-${params.period ?? ''}`} home={home} onSearch={filter => router.setParams(filter)} rooms={remote.data ?? []} navigate={navigateRoom} initialSearch={params} error={remote.error} loading={remote.loading} refresh={() => void remote.refresh()} />;
 }
 
