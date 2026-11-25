@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Modal, Text, View } from 'react-native';
 import { Button, Card, Notice, Screen, ui } from '@/components/ui/DesignSystem';
 import { BottomNavigation } from '@/components/rooms/RoomScreens';
 import { navigateRoom } from '@/components/rooms/RoomRoute';
@@ -14,6 +14,7 @@ export default function RideHistoryDetailScreen() {
   const { rideId } = useLocalSearchParams<{ rideId: string }>();
   const id = Number(rideId);
   const { user } = useAuth();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(() => {
@@ -56,7 +57,16 @@ export default function RideHistoryDetailScreen() {
           {review.comment ? <Text style={ui.body}>{review.comment}</Text> : null}</View>)}</Card>}
       <Notice>삭제하면 내 목록에서만 사라져요. 함께 탄 다른 사람의 기록은 유지됩니다.</Notice>
       {error && <Notice error>{error}</Notice>}
-      <Button secondary busy={busy} onPress={() => void hide()}>내 동승 이력 삭제</Button>
+      <Button secondary busy={busy} onPress={() => setConfirmDelete(true)}>내 동승 이력 삭제</Button>
     </>}
+    <Modal visible={confirmDelete} transparent animationType="fade" onRequestClose={() => { if (!busy) setConfirmDelete(false); }}>
+      <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#00000055' }}><Card style={{ backgroundColor: '#fff', gap: 16 }}>
+        <Text style={ui.heading}>동승 이력을 삭제할까요?</Text>
+        <Notice>내 목록에서만 사라집니다. 다른 동승자의 이력과 정산 기록은 유지돼요. 삭제 후 되돌릴 수 없습니다.</Notice>
+        {error && <Notice error>{error}</Notice>}
+        <Button busy={busy} onPress={() => void hide()}>삭제 확인</Button>
+        <Button secondary disabled={busy} onPress={() => setConfirmDelete(false)}>취소</Button>
+      </Card></View>
+    </Modal>
   </Screen>;
 }

@@ -146,3 +146,9 @@ test('signup wizard validates each step without requiring later fields', () => {
   assert.equal(typeof validateSignupStep('passwordConfirm', { ...values, password: 'Changed123!' }), 'string');
   assert.equal(validateSignup(values, values.passwordConfirm), null);
 });
+
+test('departure time accepts arbitrary minutes and rejects invalid clock values', () => {
+  const { normalizeDepartureTime } = loadAuthModules().load('features/rooms/validation');
+  for (const [input, expected] of [['14:37','14:37'],['9:07','09:07'],['1437','14:37'],['00:00','00:00'],['23:59','23:59']]) assert.equal(normalizeDepartureTime(input), expected);
+  for (const input of ['', '24:00', '12:60', '12:3', '-1:00', '12:30:00', 'abcd']) assert.equal(normalizeDepartureTime(input), null);
+});

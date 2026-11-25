@@ -1,4 +1,4 @@
-import type { PropsWithChildren, ReactNode } from 'react';
+import type { PropsWithChildren, ReactNode, Ref, ComponentRef } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -33,13 +33,13 @@ export function Button({ children, onPress, secondary = false, small = false, di
   </Pressable>;
 }
 
-export function Field({ label, icon, prefix, suffix, ...props }: TextInputProps & { label?: string; icon?: keyof typeof names; prefix?: ReactNode; suffix?: ReactNode }) {
+export function Field({ label, icon, prefix, suffix, inputRef, ...props }: TextInputProps & { label?: string; icon?: keyof typeof names; prefix?: ReactNode; suffix?: ReactNode; inputRef?: Ref<ComponentRef<typeof TextInput>> }) {
   return <View style={{ gap: 9 }}>
     {label && <Text style={ui.label}>{label}</Text>}
     <View style={ui.field}>
       {icon && <Icon name={icon} size={20} />}
       {prefix}
-      <TextInput accessibilityLabel={label ?? props.placeholder} placeholderTextColor={c.faint} {...props} style={[ui.input, props.style]} />
+      <TextInput ref={inputRef} accessibilityLabel={label ?? props.placeholder} placeholderTextColor={c.faint} {...props} style={[ui.input, props.style]} />
       {suffix}
     </View>
   </View>;
@@ -49,7 +49,7 @@ export function Card({ children, tinted = false, style }: PropsWithChildren<{ ti
   return <View style={[ui.card, tinted && ui.tinted, style]}>{children}</View>;
 }
 
-export function Screen({ title, right, children, footer, tabs, onBack, contentGap = 16 }: PropsWithChildren<{ title?: string; right?: ReactNode; footer?: ReactNode; tabs?: ReactNode; onBack?: () => void; contentGap?: number }>) {
+export function Screen({ title, right, children, footer, tabs, onBack, contentGap = 16, dismissKeyboardOnDrag = false }: PropsWithChildren<{ title?: string; right?: ReactNode; footer?: ReactNode; tabs?: ReactNode; onBack?: () => void; contentGap?: number; dismissKeyboardOnDrag?: boolean }>) {
   return <SafeAreaView style={ui.safe}>
     <View style={ui.phone}>
       {title && <View style={ui.header}>
@@ -57,7 +57,7 @@ export function Screen({ title, right, children, footer, tabs, onBack, contentGa
         <Text accessibilityRole="header" style={ui.headerTitle}>{title}</Text>
         <View style={ui.headerRight}>{right}</View>
       </View>}
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[ui.scroll, { gap: contentGap }]} showsVerticalScrollIndicator={false}>{children}</ScrollView>
+      <ScrollView keyboardDismissMode={dismissKeyboardOnDrag ? 'on-drag' : 'none'} automaticallyAdjustKeyboardInsets={dismissKeyboardOnDrag} keyboardShouldPersistTaps="handled" contentContainerStyle={[ui.scroll, { gap: contentGap }]} showsVerticalScrollIndicator={false}>{children}</ScrollView>
       {footer && <View style={ui.footer}>{footer}</View>}
       {tabs}
     </View>
