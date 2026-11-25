@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -7,8 +7,7 @@ import { MessageBubble } from '@/components/chat/MessageBubble';
 import { MessageComposer } from '@/components/chat/MessageComposer';
 import { BoardingRequestCard } from '@/components/boarding/BoardingRequestCard';
 import { acceptBoardingCheck, getCurrentBoardingCheck, requestBoardingCheck } from '@/features/boarding/api';
-import { useChatDemo } from '@/features/chat/ChatDemoContext';
-import { getRoomMessages } from '@/features/chat/messages';
+import { getChatMessages, sendChatMessage } from '@/features/chat/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { getRoomById } from '@/features/rooms/api';
 import { cancelParticipation, getParticipations } from '@/features/participation/api';
@@ -26,7 +25,9 @@ export default function RoomChatScreen() {
   const { user } = useAuth();
   const parsedRoomId = typeof roomId === 'string' ? Number(roomId) : NaN;
   const [result, setResult] = useState<{ roomId: number; room: Room | null; participationId: number | null; error: string | null } | null>(null);
-  const { messages, sendMessage } = useChatDemo();
+  const [messageSnapshot, setMessageSnapshot] = useState<{ roomId: number; messages: ChatMessage[] } | null>(null);
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const messageCursor = useRef<{ roomId: number; latestId: number; initialized: boolean } | null>(null);
   const listRef = useRef<FlatList<ChatItem>>(null);
   const listDimensionsRef = useRef({ contentHeight: 0, viewportHeight: 0 });
   const [check, setCheck] = useState<BoardingCheck | null>(null);
@@ -63,6 +64,54 @@ export default function RoomChatScreen() {
   const room = currentResult?.room;
   const activeRoomId = room?.roomId;
   const currentUserId = user?.userId;
+
+  useFocusEffect(useCallback(() => {
+    if (!activeRoomId || !currentUserId) return;
+    const pollingRoomId = activeRoomId;
+    let active = true;
+    let polling = false;
+    if (messageCursor.current?.roomId !== activeRoomId)
+      messageCursor.current = { roomId: activeRoomId, latestId: 0, initialized: false };
+    async function pollMessages() {
+      if (polling) return;
+      polling = true;
+      try {
+        const cursor = messageCursor.current;
+        const batch = await getChatMessages(pollingRoomId, cursor?.latestId ?? 0);
+        const latestCursor = messageCursor.current;
+        if (!active || !latestCursor || latestCursor.roomId !== pollingRoomId) return;
+        latestCursor.initialized = true;
+        latestCursor.latestId = Math.max(latestCursor.latestId, ...batch.map(item => item.messageId));
+        setMessageSnapshot(current => {
+          const previous = current && current.roomId === pollingRoomId ? current.messages : [];
+          const byId = new Map(previous.map(item => [item.messageId, item]));
+          batch.forEach(item => byId.set(item.messageId, item));
+          return { roomId: pollingRoomId, messages: [...byId.values()].sort((a, b) => a.messageId - b.messageId) };
+        });
+        setMessageError(null);
+      } catch (cause) {
+        if (active) setMessageError(cause instanceof Error ? cause.message : '메시지를 불러오지 못했습니다.');
+      } finally { polling = false; }
+    }
+    void pollMessages();
+    const timer = setInterval(() => void pollMessages(), 2000);
+    return () => { active = false; clearInterval(timer); };
+  }, [activeRoomId, currentUserId]));
+
+  async function sendMessage(text: string) {
+    setMessageError(null);
+    try {
+      const saved = await sendChatMessage(parsedRoomId, text);
+      setMessageSnapshot(current => {
+        const previous = current?.roomId === parsedRoomId ? current.messages : [];
+        return previous.some(item => item.messageId === saved.messageId) ? current :
+          { roomId: parsedRoomId, messages: [...previous, saved].sort((a, b) => a.messageId - b.messageId) };
+      });
+    } catch (cause) {
+      setMessageError(cause instanceof Error ? cause.message : '메시지를 보내지 못했습니다.');
+      throw cause;
+    }
+  }
 
   const applyCheck = useCallback((next: BoardingCheck) => {
     setCheck(next);
@@ -148,17 +197,19 @@ export default function RoomChatScreen() {
     return <ChatPage title="택시방 채팅" onBack={goBack}><View style={[styles.empty, styles.unavailable]}><Text style={styles.emptyTitle}>{loading ? '채팅방 불러오는 중' : '채팅방을 열 수 없어요'}</Text><Text style={styles.description}>{loadError}</Text>{!invalidRoomId && <Pressable accessibilityRole="button" onPress={goToRoom} style={styles.returnButton}><Text style={styles.returnText}>택시방 상세로</Text></Pressable>}<Pressable accessibilityRole="button" onPress={() => router.replace('/(tabs)/chats')} style={styles.returnButton}><Text style={styles.returnText}>채팅 목록으로</Text></Pressable></View></ChatPage>;
   }
 
-  const roomMessages = getRoomMessages(messages, room.roomId);
+  const messagesLoaded = messageSnapshot?.roomId === room.roomId;
+  const roomMessages = messagesLoaded ? messageSnapshot.messages : [];
   const timeline: ChatItem[] = [{ kind: 'boarding', roomId: room.roomId }, ...roomMessages.map(message => ({ kind: 'message' as const, message }))];
   return (
-    <ChatPage title="택시방 채팅" subtitle="예시 대화 · 서버 전송 없음" onBack={goBack}>
+    <ChatPage title="택시방 채팅" subtitle="동승자 대화" onBack={goBack}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.summary}>
           <View style={styles.summaryTop}><Text style={styles.route}>{room.origin.name} → {room.destination.name}</Text><Text style={styles.count}>{room.participantCount}명 / {room.capacity}명</Text></View>
           <View style={styles.summaryTop}><Text style={styles.description}>출발 {chatTime(room.departureAt)}</Text><Text style={styles.description}>나 · {room.hostUserId === user.userId ? '방장' : '참여자'}</Text></View>
           <Pressable accessibilityRole="button" onPress={goToRoom} style={styles.roomLink}><Text style={styles.roomLinkText}>택시방 상세로 돌아가기 ›</Text></Pressable>
         </View>
-        <Text style={styles.demoNotice}>탑승 확인은 서버에 저장됩니다. 채팅 메시지만 이 기기에서 시연됩니다.</Text>
+        <Text style={styles.demoNotice}>메시지는 서버에 저장되며 동승자에게 표시됩니다. 새 메시지는 약 2초마다 확인해요.</Text>
+        {messageError && <Text accessibilityRole="alert" style={styles.errorNotice}>{messageError}</Text>}
         {taxiAvailable && <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/rooms/[roomId]/taxi', params: { roomId: String(room.roomId) } })} style={styles.taxiButton}><Text style={styles.taxiButtonText}>가상 택시 이용 화면으로 이동 ›</Text></Pressable>}
         <FlatList
           ref={listRef} style={styles.flex} data={timeline} keyExtractor={(item) => item.kind === 'boarding' ? `boarding-${item.roomId}` : `message-${item.message.messageId}`}
@@ -188,9 +239,9 @@ export default function RoomChatScreen() {
             listDimensionsRef.current.viewportHeight = event.nativeEvent.layout.height;
             scrollToLatestMessage();
           }}
-          ListHeaderComponent={roomMessages.length === 0 ? <View style={styles.empty}><Text style={styles.emptyTitle}>첫 인사를 나눠 보세요</Text><Text style={styles.description}>아직 이 기기에 표시된 메시지가 없습니다.</Text></View> : undefined}
+          ListHeaderComponent={roomMessages.length === 0 ? <View style={styles.empty}><Text style={styles.emptyTitle}>첫 인사를 나눠 보세요</Text><Text style={styles.description}>{messagesLoaded ? '아직 메시지가 없습니다.' : '메시지를 불러오는 중입니다.'}</Text></View> : undefined}
         />
-        <MessageComposer key={room.roomId} onSend={(text) => sendMessage(room.roomId, user.userId, text)} />
+        <MessageComposer key={room.roomId} onSend={sendMessage} />
       </KeyboardAvoidingView>
     </ChatPage>
   );
@@ -203,6 +254,7 @@ const styles = StyleSheet.create({
   route: { color: colors.text, fontSize: 16, lineHeight: 24, fontWeight: '700' }, count: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   description: { color: colors.secondary, fontSize: 12, lineHeight: 20 },
   demoNotice: { paddingHorizontal: 20, marginBottom: 10, fontSize: 11, lineHeight: 18, color: colors.secondary },
+  errorNotice: { paddingHorizontal: 20, marginBottom: 10, fontSize: 12, lineHeight: 18, color: '#C53030' },
   roomLink: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center' },
   roomLinkText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   taxiButton: { marginHorizontal: 20, marginBottom: 8, minHeight: 44, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },

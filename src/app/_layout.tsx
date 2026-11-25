@@ -5,7 +5,6 @@ import { ActivityIndicator, useColorScheme, View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { ChatDemoProvider } from '@/features/chat/ChatDemoContext';
 import { RoomCreateDraftProvider } from '@/features/maps/RoomCreateDraftContext';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -26,7 +25,6 @@ function AuthNavigator() {
   }
   return (
     <View style={{ flex: 1, opacity: !user && !isAuthRoute && !isPreviewRoute ? 0 : 1 }}>
-    <ChatDemoProvider key={user?.userId ?? 'signed-out'}>
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={!user}>
         <Stack.Screen name="(auth)" />
@@ -39,7 +37,6 @@ function AuthNavigator() {
       </Stack.Protected>
       <Stack.Screen name="preview" />
     </Stack>
-    </ChatDemoProvider>
     </View>
   );
 }

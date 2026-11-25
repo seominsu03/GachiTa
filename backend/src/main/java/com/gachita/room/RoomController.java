@@ -28,6 +28,6 @@ public class RoomController {
     }
     @DeleteMapping("/{roomId}") public ApiResponse<Void> deleteRoom(@PathVariable Long roomId, Principal principal) {
         rooms.deleteRoom(roomId, Long.valueOf(principal.getName()));
-        return ApiResponse.ok(null, "택시방을 삭제했어요.");
+        return ApiResponse.ok(null, "목록에서 택시방을 삭제했어요.");
     }
 }

@@ -88,7 +88,7 @@ export function RoomRoute({ screen }: { screen: 'detail' | 'participants' | Sett
   };
   const deleteCurrentRoom = () => mutation.run(async () => {
     await rooms.deleteRoom(roomId);
-    router.replace('/(tabs)/mypage');
+    router.replace('/history');
   });
   const error = mutation.error ?? remote.error;
   if (screen === 'detail') return <RoomDetailScreen onUpdateCapacity={updateCapacity} onDeleteRoom={deleteCurrentRoom} onEditLocations={editLocations} onRefresh={() => void remote.refresh()} room={room} participations={members} userId={user?.userId ?? 0} navigate={navigateRoom} busy={mutation.busy} error={error} onRequest={() => mutate(() => participation.requestParticipation(roomId))} onCancel={id => mutate(() => participation.cancelParticipation(roomId, id))} />;

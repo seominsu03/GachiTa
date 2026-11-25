@@ -19,7 +19,7 @@ export function ChatPage({ children, title, subtitle, onBack }: Props) {
             <Text accessible={false} style={styles.backText}>‹</Text>
           </Pressable>
           <View style={styles.heading}><Text accessibilityRole="header" style={styles.title}>{title}</Text>{subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}</View>
-          <View style={styles.badge}><Text style={styles.badgeText}>채팅 시연</Text></View>
+          <View style={styles.badge}><Text style={styles.badgeText}>채팅</Text></View>
         </View>
         {children}
         <BottomNavigation active="chats" navigate={navigateRoom} />

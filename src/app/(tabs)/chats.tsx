@@ -7,8 +7,6 @@ import { DemoRoomCard } from '@/components/chat/DemoRoomCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { getParticipations } from '@/features/participation/api';
 import { getMyRooms } from '@/features/rooms/api';
-import { useChatDemo } from '@/features/chat/ChatDemoContext';
-import { getRoomMessages } from '@/features/chat/messages';
 import { CHAT_COLORS as colors } from '@/features/chat/theme';
 import type { Room } from '@/types/room';
 
@@ -27,7 +25,6 @@ async function getAccessibleRooms(userId: number): Promise<Room[]> {
 
 export default function ChatsScreen() {
   const { user } = useAuth();
-  const { messages } = useChatDemo();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,14 +52,11 @@ export default function ChatsScreen() {
   return (
     <ChatPage title="참여 채팅방" subtitle="내가 참여 중인 방" onBack={() => router.canGoBack() ? router.back() : router.replace('/')}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.notice}><Text style={styles.noticeTitle}>채팅 메시지는 시연용입니다</Text><Text style={styles.description}>방 목록은 서버에서 가져옵니다. 메시지는 이 기기에서만 보이고 다른 참여자에게 전달되지 않습니다.</Text></View>
+        <View style={styles.notice}><Text style={styles.noticeTitle}>동승자 채팅</Text><Text style={styles.description}>승인된 동승자끼리 메시지를 주고받을 수 있어요. 대화 내용은 서버에 저장됩니다.</Text></View>
         <Pressable accessibilityRole="button" onPress={reload} style={styles.refresh}><Text style={styles.refreshText}>목록 새로고침</Text></Pressable>
         {loading ? <ActivityIndicator accessibilityLabel="채팅방 목록 불러오는 중" /> : error ? <Text style={styles.description}>{error}</Text> : rooms.length === 0 ? <Text style={styles.description}>승인되어 참여 중인 채팅방이 없습니다.</Text> : <>
           <Text style={styles.section}>참여 채팅방 {rooms.length}</Text>
-          {rooms.map(room => {
-            const roomMessages = getRoomMessages(messages, room.roomId);
-            return <DemoRoomCard key={room.roomId} room={room} lastMessage={roomMessages.at(-1)} onPress={() => router.push({ pathname: '/rooms/[roomId]/chat', params: { roomId: room.roomId } })} />;
-          })}
+          {rooms.map(room => <DemoRoomCard key={room.roomId} room={room} onPress={() => router.push({ pathname: '/rooms/[roomId]/chat', params: { roomId: room.roomId } })} />)}
         </>}
       </ScrollView>
     </ChatPage>

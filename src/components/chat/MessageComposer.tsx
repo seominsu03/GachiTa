@@ -4,23 +4,26 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { MAX_MESSAGE_LENGTH } from '@/features/chat/messages';
 import { CHAT_COLORS as colors } from '@/features/chat/theme';
 
-export function MessageComposer({ onSend }: { onSend: (text: string) => void }) {
+export function MessageComposer({ onSend }: { onSend: (text: string) => Promise<void> }) {
   const [text, setText] = useState('');
-  const canSend = text.trim().length > 0 && text.length <= MAX_MESSAGE_LENGTH;
-  function submit() {
+  const [sending, setSending] = useState(false);
+  const canSend = !sending && text.trim().length > 0 && text.length <= MAX_MESSAGE_LENGTH;
+  async function submit() {
     if (!canSend) return;
-    onSend(text);
-    setText('');
+    setSending(true);
+    try { await onSend(text); setText(''); }
+    catch { /* The screen displays the server error and keeps the draft. */ }
+    finally { setSending(false); }
   }
   return (
     <View style={styles.container}>
       <View style={styles.row}>
-        <TextInput accessibilityLabel="메시지 입력" placeholder="메시지를 입력해 주세요" placeholderTextColor={colors.secondary} value={text} onChangeText={setText} multiline maxLength={MAX_MESSAGE_LENGTH} submitBehavior="newline" style={styles.input} />
-        <Pressable accessibilityRole="button" accessibilityLabel="메시지 전송" accessibilityState={{ disabled: !canSend }} disabled={!canSend} onPress={submit} style={({ pressed }) => [styles.send, !canSend && styles.disabled, pressed && styles.pressed]}>
+        <TextInput accessibilityLabel="메시지 입력" placeholder="메시지를 입력해 주세요" placeholderTextColor={colors.secondary} value={text} onChangeText={setText} editable={!sending} multiline maxLength={MAX_MESSAGE_LENGTH} submitBehavior="newline" style={styles.input} />
+        <Pressable accessibilityRole="button" accessibilityLabel="메시지 전송" accessibilityState={{ disabled: !canSend, busy: sending }} disabled={!canSend} onPress={() => void submit()} style={({ pressed }) => [styles.send, !canSend && styles.disabled, pressed && styles.pressed]}>
           <Text accessible={false} style={styles.arrow}>↑</Text>
         </Pressable>
       </View>
-      <Text style={styles.hint}>이 기기에서만 표시 · {text.length}/{MAX_MESSAGE_LENGTH}</Text>
+      <Text style={styles.hint}>{sending ? '전송 중 · ' : ''}{text.length}/{MAX_MESSAGE_LENGTH}</Text>
     </View>
   );
 }

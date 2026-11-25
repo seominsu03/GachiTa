@@ -14,8 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class RoomService {
     private final RoomRepository rooms; private final UserRepository users; private final ParticipationRepository members;
     private final RoomCompletionRepository completions;
-    public RoomService(RoomRepository rooms, UserRepository users, ParticipationRepository members, RoomCompletionRepository completions) {
-        this.rooms = rooms; this.users = users; this.members = members; this.completions = completions;
+    private final RideHistoryService histories;
+    public RoomService(RoomRepository rooms, UserRepository users, ParticipationRepository members, RoomCompletionRepository completions, RideHistoryService histories) {
+        this.rooms = rooms; this.users = users; this.members = members; this.completions = completions; this.histories = histories;
     }
     public RoomResponse createRoom(Long userId, RoomCreateRequest input) {
         var user = users.findById(userId).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "다시 로그인해 주세요."));
@@ -76,7 +77,7 @@ public class RoomService {
     public void deleteRoom(Long roomId, Long userId) {
         var room = lockHostRoom(roomId, userId);
         if (room.getStatus() == RoomStatus.COMPLETED) {
-            room.setStatus(RoomStatus.CANCELLED);
+            histories.hide(roomId, userId);
             return;
         }
         if (room.getStatus() != RoomStatus.RECRUITING)

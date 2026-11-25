@@ -31,6 +31,7 @@ class RideFlowIntegrationTest {
     @Autowired ParticipationService participation; @Autowired ParticipationRepository members;
     @Autowired SettlementRepository settlements; @Autowired UserRepository users;
     @Autowired RoomCompletionRepository completions; @Autowired CompletedRoomRetentionService retention;
+    @Autowired RideHistoryHideRepository hides;
     User host; User first; User second;
     @BeforeEach void setup() {
         cleanup();
@@ -38,7 +39,7 @@ class RideFlowIntegrationTest {
         first = users.save(new User("first", "하루", "unused-test-hash"));
         second = users.save(new User("second", "민트", "unused-test-hash"));
     }
-    @AfterEach void cleanup() { completions.deleteAll(); settlements.deleteAll(); members.deleteAll(); rooms.deleteAll(); users.deleteAll(); }
+    @AfterEach void cleanup() { hides.deleteAll(); completions.deleteAll(); settlements.deleteAll(); members.deleteAll(); rooms.deleteAll(); users.deleteAll(); }
     RoomCreateRequest input(int capacity) { return new RoomCreateRequest(new LocationInfo("수원역", 37.2657, 127.0007), new LocationInfo("강남역", 37.4979, 127.0276), Instant.now().plusSeconds(86400), capacity); }
     RoomResponse create(int capacity) { return roomService.createRoom(host.getUserId(), input(capacity)); }
     String as(User user) { return user.getUserId().toString(); }
@@ -340,18 +341,65 @@ class RideFlowIntegrationTest {
         }
     }
 
-    @Test void onlyHostCanDeleteCompletedRoomAndSettlementRecordRemains() throws Exception {
+    @Test void completedHistoryHideIsPrivateAndRidersKeepTheirRecords() throws Exception {
         var room = create(2);
+        var request = participation.requestParticipation(room.roomId(), first.getUserId());
+        participation.change(room.roomId(), request.participationId(), host.getUserId(), ParticipationStatus.APPROVED);
         var entity = rooms.findById(room.roomId()).orElseThrow();
         entity.setStatus(RoomStatus.COMPLETED); rooms.saveAndFlush(entity);
         completions.saveAndFlush(new RoomCompletion(entity, Instant.now()));
         String path = "/api/v1/rooms/" + room.roomId();
         mvc.perform(delete(path).with(user(as(first))).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(delete("/api/v1/history/" + room.roomId()).with(user(as(second))).with(csrf())).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/history/" + room.roomId()).with(user(as(second)))).andExpect(status().isNotFound());
         mvc.perform(delete(path).with(user(as(host))).with(csrf())).andExpect(status().isOk());
-        assertThat(rooms.findById(room.roomId()).orElseThrow().getStatus()).isEqualTo(RoomStatus.CANCELLED);
+        assertThat(rooms.findById(room.roomId()).orElseThrow().getStatus()).isEqualTo(RoomStatus.COMPLETED);
         assertThat(completions.findById(room.roomId())).isPresent();
-        mvc.perform(get(path).with(user(as(host)))).andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/rooms/mine").with(user(as(host)))).andExpect(jsonPath("$.data.length()").value(0));
+        mvc.perform(get("/api/v1/history").with(user(as(host)))).andExpect(jsonPath("$.data.length()").value(0));
+        mvc.perform(get("/api/v1/history").with(user(as(first)))).andExpect(jsonPath("$.data[0].room.roomId").value(room.roomId()));
+        mvc.perform(get("/api/v1/history/" + room.roomId()).with(user(as(first)))).andExpect(status().isOk());
+        mvc.perform(delete("/api/v1/history/" + room.roomId()).with(user(as(first))).with(csrf())).andExpect(status().isOk());
+        mvc.perform(delete("/api/v1/history/" + room.roomId()).with(user(as(first))).with(csrf())).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/history").with(user(as(first)))).andExpect(jsonPath("$.data.length()").value(0));
+        assertThat(hides.count()).isEqualTo(2);
+    }
+
+    @Test void completedRideHistorySurvivesSevenDayArchival() throws Exception {
+        var room = create(2);
+        var request = participation.requestParticipation(room.roomId(), first.getUserId());
+        participation.change(room.roomId(), request.participationId(), host.getUserId(), ParticipationStatus.APPROVED);
+        var entity = rooms.findById(room.roomId()).orElseThrow(); entity.setStatus(RoomStatus.COMPLETED); rooms.saveAndFlush(entity);
+        var now = Instant.now();
+        completions.saveAndFlush(new RoomCompletion(entity, now.minusSeconds(7 * 86400L)));
+        retention.archiveDue(now);
+        assertThat(rooms.findById(room.roomId()).orElseThrow().getStatus()).isEqualTo(RoomStatus.CANCELLED);
+        mvc.perform(get("/api/v1/rooms/mine").with(user(as(host)))).andExpect(jsonPath("$.data.length()").value(0));
+        for (var rider : List.of(host, first)) {
+            mvc.perform(get("/api/v1/history").with(user(as(rider))))
+                    .andExpect(jsonPath("$.data[0].room.roomId").value(room.roomId()))
+                    .andExpect(jsonPath("$.data[0].archived").value(true));
+            mvc.perform(get("/api/v1/history/" + room.roomId()).with(user(as(rider))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.room.status").value("COMPLETED"));
+        }
+        mvc.perform(get("/api/v1/history").with(user(as(second)))).andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test void archivedHistoryKeepsActualSettlementForBothRiders() throws Exception {
+        var room = create(2);
+        var request = participation.requestParticipation(room.roomId(), first.getUserId());
+        participation.change(room.roomId(), request.participationId(), host.getUserId(), ParticipationStatus.APPROVED);
+        var entity = rooms.findById(room.roomId()).orElseThrow(); entity.setStatus(RoomStatus.SETTLING); rooms.saveAndFlush(entity);
+        String settlementPath = "/api/v1/rooms/" + room.roomId() + "/settlement";
+        mvc.perform(post(settlementPath).with(user(as(host))).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"totalFare\":4500}")).andExpect(status().isCreated());
+        mvc.perform(patch(settlementPath + "/receipts/" + first.getUserId()).with(user(as(host))).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"received\":true}")).andExpect(status().isOk());
+        retention.archiveDue(Instant.now().plusSeconds(7 * 86400L));
+        for (var rider : List.of(host, first)) mvc.perform(get("/api/v1/history/" + room.roomId()).with(user(as(rider))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.settlement.totalFare").value(4500))
+                .andExpect(jsonPath("$.data.settlement.farePerPerson").value(2250))
+                .andExpect(jsonPath("$.data.settlement.receipts.length()").value(2));
     }
 
     @Test void completedRoomsExpireSevenDaysAfterCompletionOnly() {

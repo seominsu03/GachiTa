@@ -22,6 +22,9 @@ public interface RoomRepository extends JpaRepository<TaxiRoom, Long> {
     List<TaxiRoom> search(@Param("excludedStatuses") Collection<RoomStatus> excludedStatuses, @Param("origin") String origin,
                          @Param("destination") String destination, @Param("startHour") int startHour,
                          @Param("endHour") int endHour, Pageable pageable);
-    @Query("select r from TaxiRoom r join fetch r.host where r.status <> :excludedStatus and (r.host.userId = :userId or exists (select p.participationId from Participation p where p.room = r and p.user.userId = :userId and p.status in :statuses)) order by r.departureAt desc, r.roomId desc")
+    @Query("select r from TaxiRoom r join fetch r.host where r.status <> :excludedStatus and not exists (select h.hideId from RideHistoryHide h where h.room = r and h.user.userId = :userId) and (r.host.userId = :userId or exists (select p.participationId from Participation p where p.room = r and p.user.userId = :userId and p.status in :statuses)) order by r.departureAt desc, r.roomId desc")
     List<TaxiRoom> findMyRooms(@Param("userId") Long userId, @Param("excludedStatus") RoomStatus excludedStatus, @Param("statuses") Collection<ParticipationStatus> statuses, Pageable pageable);
+    @Query("select r from TaxiRoom r join fetch r.host where (r.status <> com.gachita.room.RoomStatus.CANCELLED or exists (select c.roomId from RoomCompletion c where c.roomId = r.roomId)) and not exists (select h.hideId from RideHistoryHide h where h.room = r and h.user.userId = :userId) and (r.host.userId = :userId or exists (select p.participationId from Participation p where p.room = r and p.user.userId = :userId and p.status in :statuses and (r.status not in (com.gachita.room.RoomStatus.COMPLETED, com.gachita.room.RoomStatus.CANCELLED) or p.status in :riderStatuses))) order by r.departureAt desc, r.roomId desc")
+    List<TaxiRoom> findMyRideHistory(@Param("userId") Long userId, @Param("statuses") Collection<ParticipationStatus> statuses,
+                                     @Param("riderStatuses") Collection<ParticipationStatus> riderStatuses, Pageable pageable);
 }
