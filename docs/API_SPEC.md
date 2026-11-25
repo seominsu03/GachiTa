@@ -186,5 +186,5 @@ GET /api/v1/rooms는 기존 destination 조건에 선택 조건 origin과 period
 - GET /api/v1/rooms: 기존 origin/destination/period와 호환. latitude, longitude, radiusMeters(100/300/500/1000), nearTarget(origin/destination) 추가. 세 좌표·반경 필드는 함께 제공해야 하며 잘못된 값은 400. 직선거리(지구 반지름 6,371km)와 텍스트·시간 조건 모두 적용 후 최대 100개 반환. 반경 검색 대상의 장소명은 프런트에서 비워 주변의 다른 이름도 포함함. 반대편 텍스트 조건은 유지.
 - metro=true: 서울·경기권 검색을 위한 위도 36.85~38.30, 경도 126.35~127.90 범위를 출발지·목적지 모두에 적용. 이 범위는 행정구역 경계 폴리곤이 아니므로 일부 인접 지역이 포함될 수 있음. 기존 클라이언트의 생략 기본값은 false, 앱 목록은 true로 요청함.
 - GET /api/v1/search-places?query=장소명: 카카오 Local API 결과 중 주소가 서울 또는 경기인 장소만 반환. [{name,address,latitude,longitude}]. 2~100자. 현재 서버의 KAKAO_REST_API_KEY 재사용. 키 미설정은 503 PLACE_KEY_MISSING, 공급자 오류는 502 PLACE_PROVIDER_ERROR.
-- GET /api/v1/search-places/region?latitude=...&longitude=...: 카카오 행정구역 조회로 서울/경기도 여부 확인. GPS 기준점 지역 확인에 사용. 서버가 실제 GPS 사용 여부를 보장하는 인증 API는 아님.
-- GPS는 검색 버튼을 눌렀을 때 전경 위치만 요청. 거절·시간 초과 시 장소명 검색 안내. GPS 좌표는 검색 파라미터로만 사용하며 프로필·DB에 저장하지 않음.
+- GET /api/v1/search-places/region?latitude=...&longitude=...: 카카오 행정구역 조회로 서울/경기도 여부 확인. 기존 API는 유지하지만 현재 앱의 택시방 검색에서는 호출하지 않는다.
+- 2026-11-26부터 앱의 주변 택시방 검색은 장소 검색 결과에서 선택한 좌표만 사용한다. 앱은 GPS 위치 권한을 요청하지 않는다.
